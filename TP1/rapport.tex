@@ -4,7 +4,7 @@
 
 \title{Rapport TP1 - Langage SLIP}
 \author{Mathias La Rochelle \& Michel Lamothe}
-\date{}
+\date{Le samedi 29 septembre 2024}
 
 \begin{document}
 
@@ -12,7 +12,27 @@
 
 \section{Introduction}
 \subsection{Objectifs du TP}
-\subsection{Présentation du langage SLIP}
+    Afin d'avoir une session interactive sur GHCi avec aucuns avertissements et aucunes exceptions, nous allons devoir compléter
+    les fonctions \textit{s2l} et \textit{eval}. Nous devons également écrire le code d'au moins 5 tests dans un fichier \texttt{tests.slip}. Tout doit bien s'exécuter
+    évidemment. \\
+
+    \noindent À noter que le tout doit bien s'exécuter sur les machines du laboratoire du DIRO à travers une connexion SSH avec \texttt{ens.iro}.
+    \subsection{Présentation du langage SLIP}
+    Le langage SLIP est un langage qui se rapproche fortement de la famille de langages Lisp. Il s'agit d'un langage fonctionnel
+    conçu pour être simple et expressif, tout en conservant certaines caractéristiques clés de Lisp. SLIP utilise une syntaxe
+    basée sur les expressions S. Nous allons explorer en profondeur le fonctionnement interne de SLIP en implémentant ses composants essentiels.
+
+\subsection{Structure du rapport}
+    Ce rapport est organisé de la manière suivante :
+    \begin{itemize}
+        \item La section 2 présente l'implémentation des fonctions principales, notamment \textit{s2l} et \textit{eval}.
+        \item La section 3 détaille les exemples et les tests réalisés pour valider notre implémentation.
+        \item La section 4 discute des difficultés rencontrées et des solutions apportées.
+        \item La section 5 conclut le rapport en résumant nos réalisations et en proposant des pistes d'amélioration.
+    \end{itemize}
+
+    Tout au long de ce rapport, nous mettrons en évidence les concepts clés du langage SLIP et les choix d'implémentation
+    effectués pour répondre aux exigences du TP.
 
 \section{Implémentation}
 \subsection{Structures de données utilisées}
