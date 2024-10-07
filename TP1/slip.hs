@@ -194,7 +194,7 @@ s2l :: Sexp -> Lexp
 s2l (Snum n) = Lnum n
 s2l (Ssym s) = Lvar s
 s2l Snil = Lfob [] (Lvar "empty")
-s2l (Snode (Ssym "let") [Snode (Ssym x) [Snum v], body]) = Llet x (Lnum v) (s2l body)
+s2l (Snode (Ssym "let") [Snode (Ssym x) [v], body]) = Llet x (s2l v) (s2l body)
 s2l (Snode (Ssym "fix") [bindings, body]) = Lfix (binds bindings) (s2l body)
     where
         binds :: Sexp -> [(Var, Lexp)]
@@ -204,6 +204,7 @@ s2l (Snode (Ssym "fix") [bindings, body]) = Lfix (binds bindings) (s2l body)
                 bind (Snode (Ssym x) [rest]) = (x, s2l rest)
                 bind _ = error "Invalid binding structure"
         binds _ = error "Invalid bindings structure"
+s2l (Snode (Ssym "if") [condition, condThen, condElse]) = Ltest (s2l condition) (s2l condThen) (s2l condElse)
             
 
 -- ¡¡COMPLÉTER ICI!!
