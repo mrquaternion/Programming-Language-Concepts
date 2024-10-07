@@ -1,5 +1,5 @@
 ;;; Quelques exemples.                  -*- mode: lisp-data; coding: utf-8 -*-
-
+true
 2                                       ; ↝ 2
 +                                       ; ↝ <primitive>
 (+ 2 4)                                 ; ↝ 6

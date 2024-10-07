@@ -1,5 +1,7 @@
 -- TP-1  --- Implantation d'une sorte de Lisp          -*- coding: utf-8 -*-
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Eta reduce" #-}
 --
 -- Ce fichier défini les fonctionalités suivantes:
 -- - Analyseur lexical
@@ -191,6 +193,19 @@ data Lexp = Lnum Int             -- Constante entière.
 s2l :: Sexp -> Lexp
 s2l (Snum n) = Lnum n
 s2l (Ssym s) = Lvar s
+s2l Snil = Lfob [] (Lvar "empty")
+s2l (Snode (Ssym "let") [Snode (Ssym x) [Snum v], body]) = Llet x (Lnum v) (s2l body)
+s2l (Snode (Ssym "fix") [bindings, body]) = Lfix (binds bindings) (s2l body)
+    where
+        binds :: Sexp -> [(Var, Lexp)]
+        binds (Snode _ bindingsRest) = map bind bindingsRest
+            where
+                bind :: Sexp -> (Var, Lexp)
+                bind (Snode (Ssym x) [rest]) = (x, s2l rest)
+                bind _ = error "Invalid binding structure"
+        binds _ = error "Invalid bindings structure"
+            
+
 -- ¡¡COMPLÉTER ICI!!
 s2l se = error ("Expression Psil inconnue: " ++ showSexp se)
 
@@ -239,7 +254,7 @@ env0 = let binop f op =
 eval :: VEnv -> Lexp -> Value
 -- ¡¡ COMPLETER !!
 eval _ (Lnum n) = Vnum n
-                  
+
 ---------------------------------------------------------------------------
 -- Toplevel                                                              --
 ---------------------------------------------------------------------------
@@ -251,7 +266,7 @@ evalSexp = eval env0 . s2l
 -- l'autre, et renvoie la liste des valeurs obtenues.
 run :: FilePath -> IO ()
 run filename =
-    do inputHandle <- openFile filename ReadMode 
+    do inputHandle <- openFile filename ReadMode
        hSetEncoding inputHandle utf8
        s <- hGetContents inputHandle
        (hPutStr stdout . show)
