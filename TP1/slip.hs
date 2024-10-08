@@ -260,9 +260,15 @@ eval :: VEnv -> Lexp -> Value
 -- ¡¡ COMPLETER !!
 eval _ (Lnum n) = Vnum n
 eval env (Lvar var) = 
-    case lookup var env of -- source : devoir 2
+    case elookup env var of -- source : devoir 2
         Just v -> v
         Nothing -> error ("Variable " ++ var ++ " non définie.")
+        where
+            elookup :: VEnv -> Var -> Maybe Value
+            elookup _ [] = Nothing
+            elookup ((var', val') : restEnv) currVar
+                | var == var' = Just val'
+                | otherwise = elookup restEnv currVar
 eval env (Llet var val body) =
     let newEnv = (var, eval env val) : env
     in eval newEnv body
