@@ -206,8 +206,8 @@ s2l (Snode (Ssym "fix") [bindings, body]) = Lfix (binds bindings) (s2l body) -- 
                 bind (Snode (Ssym var) [rest]) = (var, s2l rest)
                 bind _ = error "Invalid binding structure"
         binds _ = error "Invalid bindings structure"
-s2l (Snode op args) = Lsend (s2l op) (map s2l args)
-s2l (Snode (Ssym "if") [sexp, sthen, selse]) = Ltest (s2l sexp) (s2l sthen) (s2l selse)
+s2l (Snode op args) = Lsend (s2l op) (map s2l args) -- this work
+s2l (Snode (Ssym "if") [sexp, sthen, selse]) = Ltest (s2l sexp) (s2l sthen) (s2l selse) -- dont know
 
 
 
