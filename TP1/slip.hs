@@ -2,6 +2,8 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Eta reduce" #-}
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 --
 -- Ce fichier défini les fonctionalités suivantes:
 -- - Analyseur lexical
@@ -194,18 +196,20 @@ s2l :: Sexp -> Lexp
 s2l (Snum n) = Lnum n
 s2l (Ssym s) = Lvar s
 s2l Snil = Lfob [] (Lvar "empty")
-s2l (Snode (Ssym "let") [Snode (Ssym x) [v], body]) = Llet x (s2l v) (s2l body)
-s2l (Snode (Ssym "fix") [bindings, body]) = Lfix (binds bindings) (s2l body)
+s2l (Snode (Ssym "let") [Ssym var, val, body]) = Llet var (s2l val) (s2l body) -- this work
+s2l (Snode (Ssym "fix") [bindings, body]) = Lfix (binds bindings) (s2l body) -- this work
     where
         binds :: Sexp -> [(Var, Lexp)]
-        binds (Snode _ bindingsRest) = map bind bindingsRest
+        binds (Snode firstBind restBinds) = bind firstBind : map bind restBinds
             where
                 bind :: Sexp -> (Var, Lexp)
-                bind (Snode (Ssym x) [rest]) = (x, s2l rest)
+                bind (Snode (Ssym var) [rest]) = (var, s2l rest)
                 bind _ = error "Invalid binding structure"
         binds _ = error "Invalid bindings structure"
-s2l (Snode (Ssym "if") [condition, condThen, condElse]) = Ltest (s2l condition) (s2l condThen) (s2l condElse)
-            
+s2l (Snode op args) = Lsend (s2l op) (map s2l args)
+s2l (Snode (Ssym "if") [sexp, sthen, selse]) = Ltest (s2l sexp) (s2l sthen) (s2l selse)
+
+
 
 -- ¡¡COMPLÉTER ICI!!
 s2l se = error ("Expression Psil inconnue: " ++ showSexp se)
@@ -255,6 +259,21 @@ env0 = let binop f op =
 eval :: VEnv -> Lexp -> Value
 -- ¡¡ COMPLETER !!
 eval _ (Lnum n) = Vnum n
+eval env (Lvar var) = 
+    case lookup var env of -- source : devoir 2
+        Just v -> v
+        Nothing -> error ("Variable " ++ var ++ " non définie.")
+eval env (Llet var val body) =
+    let newEnv = (var, eval env val) : env
+    in eval newEnv body
+eval env (Lsend op args) = 
+    case eval env op of
+        Vbuiltin f -> f (map (eval env) args)
+        _ -> error "N'est pas une fonction."
+eval env (Lfix bindings body) =
+    let newEnv = [(var, eval newEnv expr) | (var, expr) <- bindings] ++ env
+    in eval newEnv body
+
 
 ---------------------------------------------------------------------------
 -- Toplevel                                                              --
@@ -285,3 +304,17 @@ lexpOf = s2l . sexpOf
 
 valOf :: String -> Value
 valOf = evalSexp . sexpOf
+
+
+-- TESTING HERE
+tests2l1 :: Lexp
+tests2l1 = s2l (readSexp "(let x 2 (let y 3 (+ x y)))") -- fonctionne
+
+tests2l2 :: Lexp
+tests2l2 = s2l (readSexp "(fix ((x 2) (y 3)) (+ x y))") -- fonctionne
+
+testeval1 :: Value
+testeval1 = eval env0 tests2l1 -- fonctionne
+
+testeval2 :: Value
+testeval2 = eval env0 tests2l2 -- fonctionne
