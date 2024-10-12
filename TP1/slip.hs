@@ -201,28 +201,33 @@ s2l Snil = Lfob [] (Lvar "vide") -- gestion de liste vide
 s2l (Snode (Ssym "let") [Ssym var, val, body]) = 
     Llet var (s2l val) (s2l body) -- this work
 s2l (Snode (Ssym "fix") [bindings, body]) = 
-    Lfix (extractBindings bindings) (s2l body)
+    Lfix (bindsExtraction bindings) (s2l body)
     where
-        extractBindings :: Sexp -> [(Var, Lexp)]
-        extractBindings (Snode firstBind restBinds) = 
-            map extractBinding (firstBind : restBinds)
-        extractBindings _ = 
+        bindsExtraction :: Sexp -> [(Var, Lexp)]
+        bindsExtraction (Snode firstBind restBinds) = 
+            map bindExtraction (firstBind : restBinds)
+        bindsExtraction _ = 
             error "Structure de la liste de liaisons invalide dans fix."
 
-        extractBinding :: Sexp -> (Var, Lexp)
+        bindExtraction :: Sexp -> (Var, Lexp)
         -- cas à 3 imbrications
-        extractBinding (Snode (Snode (Ssym var) [args]) [newBody]) =
-            (var, Lfob (extractArgs args) (s2l newBody)) 
+        bindExtraction (Snode (Snode (Ssym var) [args]) [newBody]) =
+            (var, Lfob (argsExtraction args) (s2l newBody)) 
         -- cas à 2 imbrications
-        extractBinding (Snode (Ssym var) [newBody]) = (var, s2l newBody)
-        extractBinding _ = error "Structure de liaison invalide dans fix."
+        bindExtraction (Snode (Ssym var) [newBody]) = (var, (s2l newBody))
+        bindExtraction _ = error "Structure de liaison invalide dans fix."
 
-        extractArgs :: Sexp -> [Var]
-        extractArgs Snil = []
-        extractArgs (Ssym arg) = [arg]
-        extractArgs (Snode arg rest) = 
-            extractArgs arg ++ concatMap extractArgs rest
-        extractArgs _ = error "Structure d'arguments invalide dans fix."
+        argsExtraction :: Sexp -> [Var]
+        argsExtraction Snil = []
+        argsExtraction (Ssym arg) = [arg]
+        argsExtraction (Snode arg rest) = argsExtraction arg 
+                    ++ myMap argsExtraction rest
+                        where
+                            myMap :: (Sexp -> [Var]) -> [Sexp] -> [Var]
+                            myMap _ [] = []
+                            myMap f (arg2 : rest2) = f arg2 ++ myMap f rest2 
+        argsExtraction _ = error "Structure d'arguments invalide dans fix."
+
 
 s2l (Snode (Ssym "fob") [vars, body]) = Lfob (vsExtraction vars) (s2l body)
     where
