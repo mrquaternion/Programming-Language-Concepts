@@ -1,0 +1,2 @@
+((fob () 42))                               ; ↝ 42
+((fob (x) (if (= x 5) true false)) 5)       ; ↝ True

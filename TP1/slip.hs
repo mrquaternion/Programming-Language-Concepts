@@ -191,26 +191,43 @@ data Lexp = Lnum Int             -- Constante entière.
           | Lfix [(Var, Lexp)] Lexp
           deriving (Show, Eq)
 
--- Première passe simple qui analyse une Sexp et construit une Lexp équivalente.
+-- Première passe simple qui analyse une Sexp et construit une Lexp équivalente
 s2l :: Sexp -> Lexp
 s2l (Snum n) = Lnum n
 s2l (Ssym s) = Lvar s
 s2l (Ssym "true") = Lbool True -- reconnaissance du symbole True
 s2l (Ssym "false") = Lbool False -- reconnaissance du symbole False
 s2l Snil = Lfob [] (Lvar "vide") -- gestion de liste vide
-s2l (Snode (Ssym "let") [Ssym var, val, body]) = Llet var (s2l val) (s2l body) -- this work
-s2l (Snode (Ssym "fix") [bindings, body]) = Lfix (vsBind bindings) (s2l body) -- this work
+s2l (Snode (Ssym "let") [Ssym var, val, body]) = 
+    Llet var (s2l val) (s2l body) -- this work
+s2l (Snode (Ssym "fix") [bindings, body]) = 
+    Lfix (extractBindings bindings) (s2l body)
     where
-        vsBind :: Sexp -> [(Var, Lexp)]
-        vsBind (Snode firstBind restBinds) = vBind firstBind : map vBind restBinds
-            where
-                vBind :: Sexp -> (Var, Lexp)
-                vBind (Snode (Ssym var) [rest]) = (var, s2l rest)
-                vBind sexp = error $ "Structure de la liaison variable-valeur invalide. " ++ show sexp
-        vsBind _ = error "Structure de la liste de liaisons variable-valeur invalide."
+        extractBindings :: Sexp -> [(Var, Lexp)]
+        extractBindings (Snode firstBind restBinds) = 
+            map extractBinding (firstBind : restBinds)
+        extractBindings _ = 
+            error "Structure de la liste de liaisons invalide dans fix."
+
+        extractBinding :: Sexp -> (Var, Lexp)
+        -- cas à 3 imbrications
+        extractBinding (Snode (Snode (Ssym var) [args]) [newBody]) =
+            (var, Lfob (extractArgs args) (s2l newBody)) 
+        -- cas à 2 imbrications
+        extractBinding (Snode (Ssym var) [newBody]) = (var, s2l newBody)
+        extractBinding _ = error "Structure de liaison invalide dans fix."
+
+        extractArgs :: Sexp -> [Var]
+        extractArgs Snil = []
+        extractArgs (Ssym arg) = [arg]
+        extractArgs (Snode arg rest) = 
+            extractArgs arg ++ concatMap extractArgs rest
+        extractArgs _ = error "Structure d'arguments invalide dans fix."
+
 s2l (Snode (Ssym "fob") [vars, body]) = Lfob (vsExtraction vars) (s2l body)
     where
         vsExtraction :: Sexp -> [Var]
+        vsExtraction Snil = [] -- si la fonction ne prend pas d'argument
         vsExtraction (Snode hd tl) = vExtraction hd : vsExtraction' tl
         vsExtraction _ = error "Liste de variables invalide dans fob."
 
@@ -302,20 +319,21 @@ eval env (Lsend func args) =
                     let argVals = map (eval env) args
                         newEnv = myZip params argVals ++ closureEnv ++ env
                     in eval newEnv body
-                else error ("Manque " ++ show (abs (length params - length args))
-                                                  ++ " arguments à la fonction.")
+                else error ("Manque " 
+                                ++ show (abs (length params - length args))
+                                                ++ " arguments à la fonction.")
                     where
                         myZip :: [Var] -> [Value] -> [(Var, Value)]
                         myZip _ [] = []
                         myZip [] _ = []
                         myZip (x:xs) (y:ys) = (x,y) : myZip xs ys
-        Vbuiltin f -> f (map (eval env) args) -- pattern utilisé par Lfix et Llet
+        Vbuiltin f -> f (map (eval env) args) -- pattern utilisé par Lfix, Llet
         _ -> error "N'est pas une fonction."
 eval env (Ltest cond thenExp elseExp) =
     case eval env cond of
         Vbool True  -> eval env thenExp
         Vbool False -> eval env elseExp
-        _ -> error "Condition in if-statement must be a boolean"
+        _ -> error "La condition doit être un booléen."
 
 ---------------------------------------------------------------------------
 -- Toplevel                                                              --
@@ -349,48 +367,64 @@ valOf = evalSexp . sexpOf
 
 
 -- ### TESTING HERE ###
-
--- Transformation de SEXP à LEXP
--- fonctionne 
+-- fonctionne
 tests2l1 :: Lexp
 tests2l1 = s2l (readSexp "(let x 2 (let y 3 (+ x y)))")
+
+testeval1 :: Value
+testeval1 = eval env0 tests2l1
 
 -- fonctionne 
 tests2l2 :: Lexp
 tests2l2 = s2l (readSexp "(fix ((x 2) (y 3)) (+ x y))")
 
+testeval2 :: Value
+testeval2 = eval env0 tests2l2
+
 -- fonctionne 
 tests2l3 :: Lexp
 tests2l3 = s2l (readSexp "((fob (x) x) 2)")
 
--- fonctionne 
+testeval3 :: Value
+testeval3 = eval env0 tests2l3
+
+-- Test de la fonction fob 
 tests2l4_1 :: Lexp
 tests2l4_1 = s2l (readSexp "(((fob (x) (fob (y) (* x y))) 3) 5)")
 
--- fonctionne (test d'erreur par omission du 2e argument)
+testeval4_1 :: Value
+testeval4_1 = eval env0 tests2l4_1
+
+-- Test d'erreur par omission du 2e argument
 tests2l4_2 :: Lexp
 tests2l4_2 = s2l (readSexp "(((fob (x) (fob (y) (* x y))) 3) )")
+
+testeval4_2 :: Value
+testeval4_2 = eval env0 tests2l4_2
 
 tests2l5 :: Lexp
 tests2l5 = s2l (readSexp "(fix (((even x) (if (= x 0) true  (odd  (- x 1)))) ((odd x) (if (= x 0) false (even (- x 1))))) (odd 42))")
 
--- Évaluation des LEXP obtenus
--- fonctionne
-testeval1 :: Value
-testeval1 = eval env0 tests2l1
+testeval5 :: Value
+testeval5 = eval env0 tests2l5
 
--- fonctionne
-testeval2 :: Value
-testeval2 = eval env0 tests2l2
+-- Test pour la fonction fob sans arguments
+tests2l6 :: Lexp
+tests2l6 = s2l (readSexp "(fob () 42)")
 
--- fonctionne
-testeval3 :: Value
-testeval3 = eval env0 tests2l3
+testeval6 :: Value
+testeval6 = eval env0 tests2l6 -- devrait retourner <fobjet>
 
--- fonctionne
-testeval4_1 :: Value
-testeval4_1 = eval env0 tests2l4_1
+-- Test pour appel de la fonction fob sans arguments
+tests2l7 :: Lexp
+tests2l7 = s2l (readSexp "((fob () 42))")
 
--- fonctionne
-testeval4_2 :: Value
-testeval4_2 = eval env0 tests2l4_2
+testeval7 :: Value
+testeval7 = eval env0 tests2l7
+
+-- Test pour appel de la fonction fob avec conditionnement
+tests2l8 :: Lexp
+tests2l8 = s2l (readSexp "((fob (x) (if (= x 5) true false)) 5)")
+
+testeval8 :: Value
+testeval8 = eval env0 tests2l8
