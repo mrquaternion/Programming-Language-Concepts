@@ -195,19 +195,36 @@ data Lexp = Lnum Int             -- Constante entière.
 s2l :: Sexp -> Lexp
 s2l (Snum n) = Lnum n
 s2l (Ssym s) = Lvar s
-s2l Snil = Lfob [] (Lvar "empty")
+s2l (Ssym "true") = Lbool True -- reconnaissance du symbole True
+s2l (Ssym "false") = Lbool False -- reconnaissance du symbole False
+s2l Snil = Lfob [] (Lvar "vide") -- gestion de liste vide
 s2l (Snode (Ssym "let") [Ssym var, val, body]) = Llet var (s2l val) (s2l body) -- this work
-s2l (Snode (Ssym "fix") [bindings, body]) = Lfix (binds bindings) (s2l body) -- this work
+s2l (Snode (Ssym "fix") [bindings, body]) = Lfix (vsBind bindings) (s2l body) -- this work
     where
-        binds :: Sexp -> [(Var, Lexp)]
-        binds (Snode firstBind restBinds) = bind firstBind : map bind restBinds
+        vsBind :: Sexp -> [(Var, Lexp)]
+        vsBind (Snode firstBind restBinds) = vBind firstBind : map vBind restBinds
             where
-                bind :: Sexp -> (Var, Lexp)
-                bind (Snode (Ssym var) [rest]) = (var, s2l rest)
-                bind _ = error "Invalid binding structure"
-        binds _ = error "Invalid bindings structure"
-s2l (Snode op args) = Lsend (s2l op) (map s2l args) -- this work
-s2l (Snode (Ssym "if") [sexp, sthen, selse]) = Ltest (s2l sexp) (s2l sthen) (s2l selse) -- dont know
+                vBind :: Sexp -> (Var, Lexp)
+                vBind (Snode (Ssym var) [rest]) = (var, s2l rest)
+                vBind sexp = error $ "Structure de la liaison variable-valeur invalide. " ++ show sexp
+        vsBind _ = error "Structure de la liste de liaisons variable-valeur invalide."
+s2l (Snode (Ssym "fob") [vars, body]) = Lfob (vsExtraction vars) (s2l body)
+    where
+        vsExtraction :: Sexp -> [Var]
+        vsExtraction (Snode hd tl) = vExtraction hd : vsExtraction' tl
+        vsExtraction _ = error "Liste de variables invalide dans fob."
+
+        vsExtraction' :: [Sexp] -> [Var]
+        vsExtraction' [] = []
+        vsExtraction' (x:xs) = vExtraction x : vsExtraction' xs
+
+        vExtraction :: Sexp -> Var
+        vExtraction (Ssym var) = var
+        vExtraction _ = error "Variable invalide dans fob."
+s2l (Snode (Ssym "if") [cond, thenExp, elseExp]) = 
+    Ltest (s2l cond) (s2l thenExp) (s2l elseExp) -- this work
+s2l (Snode op args) = Lsend (s2l op) (map s2l args) -- gestion des opérateurs
+
 
 
 
@@ -259,27 +276,46 @@ env0 = let binop f op =
 eval :: VEnv -> Lexp -> Value
 -- ¡¡ COMPLETER !!
 eval _ (Lnum n) = Vnum n
-eval env (Lvar var) = 
+eval _ (Lbool b) = Vbool b -- reconnaissance d'un boolean
+eval env (Lvar var) =
     case elookup env var of -- source : devoir 2
         Just v -> v
         Nothing -> error ("Variable " ++ var ++ " non définie.")
         where
             elookup :: VEnv -> Var -> Maybe Value
-            elookup _ [] = Nothing
+            elookup [] _ = Nothing
             elookup ((var', val') : restEnv) currVar
-                | var == var' = Just val'
+                | currVar == var' = Just val'
                 | otherwise = elookup restEnv currVar
 eval env (Llet var val body) =
     let newEnv = (var, eval env val) : env
     in eval newEnv body
-eval env (Lsend op args) = 
-    case eval env op of
-        Vbuiltin f -> f (map (eval env) args)
-        _ -> error "N'est pas une fonction."
 eval env (Lfix bindings body) =
     let newEnv = [(var, eval newEnv expr) | (var, expr) <- bindings] ++ env
     in eval newEnv body
-
+eval env (Lfob params body) = Vfob env params body
+eval env (Lsend func args) =
+    case eval env func of
+        Vfob closureEnv params body -> -- pattern utilisé par Lfob
+            if length params == length args
+                then
+                    let argVals = map (eval env) args
+                        newEnv = myZip params argVals ++ closureEnv ++ env
+                    in eval newEnv body
+                else error ("Manque " ++ show (abs (length params - length args))
+                                                  ++ " arguments à la fonction.")
+                    where
+                        myZip :: [Var] -> [Value] -> [(Var, Value)]
+                        myZip _ [] = []
+                        myZip [] _ = []
+                        myZip (x:xs) (y:ys) = (x,y) : myZip xs ys
+        Vbuiltin f -> f (map (eval env) args) -- pattern utilisé par Lfix et Llet
+        _ -> error "N'est pas une fonction."
+eval env (Ltest cond thenExp elseExp) =
+    case eval env cond of
+        Vbool True  -> eval env thenExp
+        Vbool False -> eval env elseExp
+        _ -> error "Condition in if-statement must be a boolean"
 
 ---------------------------------------------------------------------------
 -- Toplevel                                                              --
@@ -312,15 +348,49 @@ valOf :: String -> Value
 valOf = evalSexp . sexpOf
 
 
--- TESTING HERE
+-- ### TESTING HERE ###
+
+-- Transformation de SEXP à LEXP
+-- fonctionne 
 tests2l1 :: Lexp
-tests2l1 = s2l (readSexp "(let x 2 (let y 3 (+ x y)))") -- fonctionne
+tests2l1 = s2l (readSexp "(let x 2 (let y 3 (+ x y)))")
 
+-- fonctionne 
 tests2l2 :: Lexp
-tests2l2 = s2l (readSexp "(fix ((x 2) (y 3)) (+ x y))") -- fonctionne
+tests2l2 = s2l (readSexp "(fix ((x 2) (y 3)) (+ x y))")
 
+-- fonctionne 
+tests2l3 :: Lexp
+tests2l3 = s2l (readSexp "((fob (x) x) 2)")
+
+-- fonctionne 
+tests2l4_1 :: Lexp
+tests2l4_1 = s2l (readSexp "(((fob (x) (fob (y) (* x y))) 3) 5)")
+
+-- fonctionne (test d'erreur par omission du 2e argument)
+tests2l4_2 :: Lexp
+tests2l4_2 = s2l (readSexp "(((fob (x) (fob (y) (* x y))) 3) )")
+
+tests2l5 :: Lexp
+tests2l5 = s2l (readSexp "(fix (((even x) (if (= x 0) true  (odd  (- x 1)))) ((odd x) (if (= x 0) false (even (- x 1))))) (odd 42))")
+
+-- Évaluation des LEXP obtenus
+-- fonctionne
 testeval1 :: Value
-testeval1 = eval env0 tests2l1 -- fonctionne
+testeval1 = eval env0 tests2l1
 
+-- fonctionne
 testeval2 :: Value
-testeval2 = eval env0 tests2l2 -- fonctionne
+testeval2 = eval env0 tests2l2
+
+-- fonctionne
+testeval3 :: Value
+testeval3 = eval env0 tests2l3
+
+-- fonctionne
+testeval4_1 :: Value
+testeval4_1 = eval env0 tests2l4_1
+
+-- fonctionne
+testeval4_2 :: Value
+testeval4_2 = eval env0 tests2l4_2
