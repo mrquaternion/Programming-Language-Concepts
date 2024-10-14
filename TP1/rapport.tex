@@ -1,6 +1,7 @@
 \documentclass{article}
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx}
+\usepackage[a4paper, left=1in, right=1in, top=1in, bottom=1in]{geometry}
 
 \title{Rapport TP1 - Langage SLIP}
 \author{Mathias La Rochelle \& Michel Lamothe}
@@ -9,35 +10,84 @@
 \begin{document}
 
 \maketitle
+\setlength{\parindent}{0pt}
+
 
 \section{Introduction}
 \subsection{Objectifs du TP}
-    Afin d'avoir une session interactive sur GHCi avec aucuns avertissements et aucunes exceptions, nous allons devoir compléter
-    les fonctions \textit{s2l} et \textit{eval}. Nous devons également écrire le code d'au moins 5 tests dans un fichier \texttt{tests.slip}. Tout doit bien s'exécuter
-    évidemment. \\
+Afin d'avoir une session interactive sur GHCi avec aucuns avertissements et aucunes exceptions, nous allons devoir compléter les fonctions \textit{s2l} et \textit{eval}. Nous devons également écrire le code d'au moins 5 tests dans un fichier \texttt{tests.slip}. Tout doit bien s'exécuter évidemment. \\
 
-    \noindent À noter que le tout doit bien s'exécuter sur les machines du laboratoire du DIRO à travers une connexion SSH avec \texttt{ens.iro}.
-    \subsection{Présentation du langage SLIP}
-    Le langage SLIP est un langage qui se rapproche fortement de la famille de langages Lisp. Il s'agit d'un langage fonctionnel
-    conçu pour être simple et expressif, tout en conservant certaines caractéristiques clés de Lisp. SLIP utilise une syntaxe
-    basée sur les expressions S. Nous allons explorer en profondeur le fonctionnement interne de SLIP en implémentant ses composants essentiels.
+\noindent À noter que le tout doit bien s'exécuter sur les machines du laboratoire du DIRO à travers une connexion SSH avec \texttt{ens.iro}.
+
+\subsection{Présentation du langage SLIP}
+Le langage SLIP est un langage qui se rapproche fortement de la famille de langages Lisp. Il s'agit d'un langage fonctionnel conçu pour être simple et expressif, tout en conservant certaines caractéristiques clés de Lisp. SLIP utilise une syntaxe basée sur les expressions S. Nous allons explorer en profondeur le fonctionnement interne de SLIP en implémentant ses composants essentiels.
 
 \subsection{Structure du rapport}
-    Ce rapport est organisé de la manière suivante :
-    \begin{itemize}
-        \item La section 2 présente l'implémentation des fonctions principales, notamment \textit{s2l} et \textit{eval}.
-        \item La section 3 détaille les exemples et les tests réalisés pour valider notre implémentation.
-        \item La section 4 discute des difficultés rencontrées et des solutions apportées.
-        \item La section 5 conclut le rapport en résumant nos réalisations et en proposant des pistes d'amélioration.
-    \end{itemize}
+Ce rapport est organisé de la manière suivante :
+\begin{itemize}
+    \item La section 2 présente l'implémentation des fonctions principales, notamment \textit{s2l} et \textit{eval}.
+    \item La section 3 détaille les exemples et les tests réalisés pour valider notre implémentation.
+    \item La section 4 discute des difficultés rencontrées et des solutions apportées.
+    \item La section 5 conclut le rapport en résumant nos réalisations et en proposant des pistes d'amélioration.
+\end{itemize}
 
-    Tout au long de ce rapport, nous mettrons en évidence les concepts clés du langage SLIP et les choix d'implémentation
-    effectués pour répondre aux exigences du TP.
+Tout au long de ce rapport, nous mettrons en évidence les concepts clés du langage SLIP et les choix d'implémentation effectués pour répondre aux exigences du TP. \\
 
 \section{Implémentation}
+Dans ce projet, l’objectif est d’implémenter une variante simplifiée de "Lisp" en utilisant Haskell. L’implémentation repose sur deux parties principales : la conversion des expressions symboliques "Sexp" vers une forme simplifiée "Lexp", et l’évaluation de ces expressions dans un environnement d’exécution. Nous avons dû construire deux fonctions manquantes, \texttt{s2l} et \texttt{eval}, pour assurer que le code fonctionne correctement en convertissant et évaluant les expressions de manière cohérente.\\
+
+Après avoir analysé l’expression symbolique \texttt{Sexp}, nous devons la transformer en une forme de logique de programmation (\texttt{Lexp}), puis l'évaluée pour produire un résultat à l’exécution. L'implémentation met en jeu des concepts fondamentaux comme la définition de variables, l'évaluation d'expressions conditionnelles, les fonctions récursives et les appels de fonctions.
+
 \subsection{Structures de données utilisées}
+
+\texttt{Sexp} : Cette structure de données représente les expressions du langage que nous manipulons. Elle permet de représenter les entiers, les symboles et les listes imbriquées de manière récursive.
+\begin{itemize}
+    \item \texttt{Snil} : Représente une liste vide.
+    \item \texttt{Ssym String} : Représente un symbole sous forme de chaîne de caractères.
+    \item \texttt{Snum Int} : Représente un entier.
+    \item \texttt{Snode Sexp [Sexp]} : Représente une liste non vide d’expressions.
+\end{itemize}
+
+\texttt{Lexp} : C’est la forme intermédiaire d’une expression après analyse syntaxique. Elle simplifie les calculs et facilite l'évaluation.
+\begin{itemize}
+    \item \texttt{Lnum Int} : Constante entière.
+    \item \texttt{Lbool Bool} : Constante booléenne.
+    \item \texttt{Lvar Var} : Référence à une variable.
+    \item \texttt{Ltest Lexp Lexp Lexp} : Expression conditionnelle (équivalente à if).
+    \item \texttt{Lfob [Var] Lexp} : Définition d'une fonction (objet fonctionnel).
+    \item \texttt{Lsend Lexp [Lexp]} : Appel de fonction avec arguments.
+    \item \texttt{Llet Var Lexp Lexp} : Déclaration locale non récursive.
+    \item \texttt{Lfix [(Var, Lexp)] Lexp} : Déclaration de variables mutuellement récursives.
+\end{itemize}
+
+\texttt{VEnv} : Une liste de paires (Var, Value) où Var est le nom d’une variable et Value est la valeur correspondante. Utilisée dans l’évaluation pour suivre les variables définies et leur portée.
+
+\texttt{Value} : Représente les différentes valeurs que peut manipuler le langage lors de l’exécution.
+\begin{itemize}
+    \item \texttt{Vnum Int} : Entier.
+    \item \texttt{Vbool Bool} : Booléen.
+    \item \texttt{Vbuiltin ([Value] -> Value)} : Fonction primitive (comme + ou -).
+    \item \texttt{Vfob VEnv [Var] Lexp} : Objet fonctionnel avec un environnement.
+\end{itemize}
+
 \subsection{Fonctions principales}
+\texttt{s2l (Conversion de Sexp vers Lexp) :} La fonction s2l convertit une expression de type Sexp une expression logique Lexp. Cette conversion permet de simplifier la manipulation et l’évaluation des expressions.
+La façon dont s2l est implémenté :
+\begin{itemize}
+    \item L’analyse commence par un pattern matching sur les différentes formes de Sexp.
+    \item Si l’expression est un entier (Snum), elle est convertie en Lnum.
+    \item Si l’expression est une fonction comme "let", elle est transformée en une structure de type "Llet".
+    \item En cas de liste vide "Snil", la fonction "Lfob" est utilisée pour définir un objet fonctionnel avec une liste vide de paramètres.
+\end{itemize}
+\texttt{Exemple} : s2l (Snode (Ssym "let") [Ssym "x", Snum 2, Snode (Ssym "+") [Lvar "x", Lnum 3]])
+
+\hspace{1cm}\texttt{Résultat} : Llet "x" (Lnum 2) (Lsend (Lvar "+") [Lvar "x", Lnum 3])
+
+\end{itemize}
+
 \subsection{Difficultés rencontrées et solutions}
+
+Je ne sais pas :(
 
 \section{Exemples et tests}
 \subsection{Cas de test simples}
@@ -57,3 +107,4 @@
 \subsection{Exemples supplémentaires}
 
 \end{document}
+
