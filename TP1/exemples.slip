@@ -13,3 +13,80 @@ true
 (fix (((even x)  (if (= x 0) true  (odd  (- x 1))))
       ((odd x)   (if (= x 0) false (even (- x 1)))))
   (odd 42))                             ; ↝ False
+
+
+Test 1 : Déclaration et utilisation de variable avec let
+Code :
+eval env0 (s2l (readSexp "(let x 5 (+ x 3))"))
+-- Résultat attendu : Vnum 8
+
+Explications :
+- Llet : Teste la déclaration locale d’une variable x.
+- Lvar : Vérifie que la variable x est correctement récupérée dans le corps du let.
+- Lsend : Utilisation d'une opération arithmétique (+).
+- Lnum : Test implicite d’un entier, avec les valeurs 5 et 3.
+
+---
+
+Test 2 : Condition avec if
+Code :
+eval env0 (s2l (readSexp "(if (> 5 3) 1 0)"))
+-- Résultat attendu : Vnum 1
+
+Explications :
+- Ltest : Test de la structure conditionnelle if.
+- Lbool : Évaluation d’un booléen, avec la comparaison (> 5 3) qui retourne True.
+- Lsend : Utilisation de l'opérateur > sur des entiers.
+- Lnum : Test implicite des entiers dans la branche conditionnelle (1 et 0).
+
+---
+
+Test 3 : Récursivité avec fix
+Code :
+eval env0 (s2l (readSexp "(fix (((even x) (if (= x 0) true (odd (- x 1)))) ((odd x) (if (= x 0) false (even (- x 1))))) (odd 4))"))
+-- Résultat attendu : Vbool False
+
+Explications :
+- Lfix : Vérifie la déclaration mutuellement récursive de even et odd.
+- Lsend : Utilisation de l’opérateur - et d'appels récurrents à even et odd.
+- Ltest : Évaluation conditionnelle dans la récursion.
+- Lbool : Manipulation explicite de booléens (True et False).
+- Récursion : Test de la capacité à gérer plusieurs appels récursifs imbriqués.
+
+---
+
+Test 4 : Fonction avec paramètres et appel imbriqué (Lfob)
+Code :
+eval env0 (s2l (readSexp "(((fob (x) (fob (y) (* x y))) 3) 2)"))
+-- Résultat attendu : Vnum 6
+
+Explications :
+- Lfob : Vérifie la création d’un objet fonctionnel avec paramètres.
+- Lsend : Appel imbriqué de fonctions, avec 3 et 2 passés en paramètres.
+- Fermeture (closure) : Teste la capture d’environnement lors de l'exécution de fonctions imbriquées.
+- Opération arithmétique : Multiplication de x et y avec *.
+
+---
+
+Test 5 : Fonction sans paramètre avec Lfob
+Code :
+eval env0 (s2l (readSexp "((fob () 42))"))
+-- Résultat attendu : Vnum 42
+
+Explications :
+- Lfob : Vérifie la gestion d’un objet fonctionnel sans paramètres.
+- Lsend : Appel de la fonction sans fournir d’arguments.
+- Lnum : Test implicite de la valeur retournée (42).
+- Fermeture (closure) : Teste qu’une fonction sans paramètres conserve son environnement.
+
+---
+
+Résumé des concepts couverts
+
+1. Lnum et Lbool : Testés implicitement dans les tests 1, 2, 3, et 5.
+2. Lvar : Testé dans le test 1 avec l’accès à la variable x.
+3. Llet : Déclaration de variable locale, testée dans le test 1.
+4. Lfob et Lsend : Gestion des fonctions avec ou sans paramètres, testées dans les tests 4 et 5.
+5. Ltest : Conditions avec if, testées dans le test 2 et la récursion (test 3).
+6. Lfix : Gestion de la récursivité, testée dans le test 3.
+7. Appels imbriqués et environnements : Testés dans les tests 4 et 5.
