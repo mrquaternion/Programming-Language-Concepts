@@ -127,22 +127,89 @@ La façon dont s2l est implémenté :
 
 Je ne sais pas :(
 
-\section{Exemples et tests}
-\subsection{Cas de test simples}
+\newpage 
+\section{Exemples et tests} 
+\subsection{Cas de test simples} 
+\subsubsection*{Test 1 : Fonction sans paramètre} 
+\hspace{.5cm}\textbf{Expression :} 
+\begin{verbatim} 
+    (fob () 42)) 
+\end{verbatim} 
+\hspace{.5cm}\textbf{Explications :} 
+\begin{itemize} 
+    \item Teste la création et l'appel d'une fonction sans paramètre. 
+    \item Vérifie que la fonction retourne bien la valeur 42. 
+\end{itemize}
+\subsubsection*{Test 2 : Fonction avec paramètre simple} 
+\hspace{.5cm}\textbf{Expression :} 
+\begin{verbatim} 
+    ((fob (x) (if (= x 5) true false)) 5) 
+\end{verbatim} 
+\hspace{.5cm}\textbf{Explications :} 
+\begin{itemize} 
+    \item Teste une fonction qui prend un paramètre. 
+    \item Vérifie si le paramètre vaut 5 pour retourner \texttt{true}, sinon \texttt{false}. 
+\end{itemize}
+\subsubsection*{Test 3 : Fonction avec let et fermeture} 
+\hspace{.5cm}\textbf{Expression :} 
+\begin{verbatim} 
+    (let x 5 ((fob (x) (+ x 3)) x)) 
+\end{verbatim} 
+\hspace{.5cm}\textbf{Explications :} 
+\begin{itemize} 
+    \item Déclare une variable \texttt{x} locale avec la valeur 5. 
+    \item Appelle une fonction qui ajoute 3 à \texttt{x} et retourne le résultat. 
+\end{itemize}
+
 \subsection{Cas de test complexes}
-\subsection{Analyse des résultats}
+\subsubsection*{Test 4 : Fonction récursive (factorielle)} 
+\hspace{.5cm}\textbf{Expression :} 
+\begin{verbatim} 
+    (fix ((fact (fob (n) 
+                        (if (= n 0) 1 
+                        (* n (fact (- n 1))))))) 
+         (fact 5)) 
+\end{verbatim} 
+\hspace{.5cm}\textbf{Explications :} 
+\begin{itemize} 
+    \item Teste la récursion pour calculer la factorielle de 5. 
+    \item Vérifie que la base de récursion (\texttt{n = 0}) retourne 1. 
+\end{itemize}
+\subsubsection*{Test 5 : Fonction imbriquée avec trois paramètres} 
+\hspace{.5cm}\textbf{Expression :} 
+\begin{verbatim} 
+    (let volume ((((fob (x) (fob (y) (fob (z) (* x (* y z))))) 3) 2) 4) 
+                (if (= volume 16) true false))
+\end{verbatim} 
+\hspace{.5cm}\textbf{Explications :} 
+\begin{itemize} 
+    \item Teste une fonction imbriquée prenant trois paramètres (\texttt{x}, \texttt{y}, \texttt{z}). 
+    \item Calcule \texttt{volume} et vérifie si la valeur obtenue est 16. 
+\end{itemize}
+%\subsection{Analyse des résultats}
+%\subsubsection*{Résumé des concepts couverts}
+%\begin{enumerate}
+%\item \texttt{Lnum} et \texttt{Lbool} : Testés implicitement dans les tests 1, 2, 3, et 5.
+%\item \texttt{Lvar} : Testé dans le test 1 avec l'accès à la variable x.
+%\item \texttt{Llet} : Déclaration de variable locale, testée dans le test 1.
+%\item \texttt{Lfob} et \texttt{Lsend} : Gestion des fonctions avec ou sans paramètres, testées dans les tests 4 et 5.
+%\item \texttt{Ltest} : Conditions avec if, testées dans le test 2 et la récursion (test 3).
+%\item \texttt{Lfix} : Gestion de la récursivité, testée dans le test 3.
+%\item Appels imbriqués et environnements : Testés dans les tests 4 et 5.
+%\end{enumerate}
 
-\section{Extension du langage}
-\subsection{Nouvelles fonctionnalités implémentées}
-\subsection{Justification des choix}
+\newpage
+\section*{Extension du langage}
+\subsection*{Nouvelles fonctionnalités implémentées}
+\subsection*{Justification des choix}
 
-\section{Conclusion}
-\subsection{Récapitulatif des réalisations}
-\subsection{Perspectives d'amélioration}
+\section*{Conclusion}
+\subsection*{Récapitulatif des réalisations}
+\subsection*{Perspectives d'amélioration}
 
-\section{Annexes}
-\subsection{Code source complet}
-\subsection{Exemples supplémentaires}
+\section*{Annexes}
+\subsection*{Code source complet}
+\subsection*{Exemples supplémentaires}
 
 \end{document}
 

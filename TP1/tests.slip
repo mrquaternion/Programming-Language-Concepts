@@ -1,2 +1,10 @@
 ((fob () 42))                               ; ↝ 42
 ((fob (x) (if (= x 5) true false)) 5)       ; ↝ True
+(let x 5 ((fob (x) (+ x 3)) x))             ; ↝ 8
+(fix ((fact (fob (n) 
+                    (if (= n 0) 1 
+                    (* n (fact (- n 1))))))) 
+     (fact 5))                              ; ↝ 120
+
+(let volume ((((fob (x) (fob (y) (fob (z) (* x (* y z))))) 3) 2) 4) 
+            (if (= volume 16) true false))  ; ↝ False
