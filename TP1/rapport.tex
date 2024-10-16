@@ -3,6 +3,16 @@
 \usepackage{graphicx}
 \usepackage[a4paper, left=1in, right=1in, top=1in, bottom=1in]{geometry}
 \usepackage{enumitem}
+\usepackage{listings}
+
+\lstset{ % Configuration des listings
+  language=Haskell,               % Langage de programmation
+  basicstyle=\ttfamily\footnotesize, % Style du texte
+  numbers=left,                  % Numérotation des lignes à gauche
+  stepnumber=1,                  % Numérotation des lignes toutes les 1 ligne
+  showstringspaces=false,         % Ne montre pas les espaces dans les chaînes
+  frame=single,                  % Cadre autour du code
+}
 
 
 \title{Rapport TP1 - Langage SLIP}
@@ -19,8 +29,6 @@
 \subsection{Objectifs du TP}
 Afin d'avoir une session interactive sur GHCi avec aucuns avertissements et aucunes exceptions, nous allons devoir compléter les fonctions \textit{s2l} et \textit{eval}. Nous devons également écrire le code d'au moins 5 tests dans un fichier \texttt{tests.slip}. Tout doit bien s'exécuter évidemment. \\
 
-\noindent À noter que le tout doit bien s'exécuter sur les machines du laboratoire du DIRO à travers une connexion SSH avec \texttt{ens.iro}.
-
 \subsection{Présentation du langage SLIP}
 Le langage SLIP est un langage qui se rapproche fortement de la famille de langages Lisp. Il s'agit d'un langage fonctionnel conçu pour être simple et expressif, tout en conservant certaines caractéristiques clés de Lisp. SLIP utilise une syntaxe basée sur les expressions S. Nous allons explorer en profondeur le fonctionnement interne de SLIP en implémentant ses composants essentiels.
 
@@ -35,97 +43,66 @@ Ce rapport est organisé de la manière suivante :
 
 Tout au long de ce rapport, nous mettrons en évidence les concepts clés du langage SLIP et les choix d'implémentation effectués pour répondre aux exigences du TP. \\
 
-\section{Implémentation}
-Dans ce projet, l’objectif est d’implémenter une variante simplifiée de "Lisp" en utilisant Haskell. L’implémentation repose sur deux parties principales : la conversion des expressions symboliques "Sexp" vers une forme simplifiée "Lexp", et l’évaluation de ces expressions dans un environnement d’exécution. Nous avons dû construire deux fonctions manquantes, \texttt{s2l} et \texttt{eval}, pour assurer que le code fonctionne correctement en convertissant et évaluant les expressions de manière cohérente.\\
-
-Après avoir analysé l’expression symbolique \texttt{Sexp}, nous devons la transformer en une forme de logique de programmation (\texttt{Lexp}), puis l'évaluée pour produire un résultat à l’exécution. L'implémentation met en jeu des concepts fondamentaux comme la définition de variables, l'évaluation d'expressions conditionnelles, les fonctions récursives et les appels de fonctions.
-
-\subsection{Structures de données utilisées}
-
-\texttt{Sexp} : Cette structure de données représente les expressions du langage que nous manipulons. Elle permet de représenter les entiers, les symboles et les listes imbriquées de manière récursive.
-\begin{itemize}
-    \item \texttt{Snil} : Représente une liste vide.
-    \item \texttt{Ssym String} : Représente un symbole sous forme de chaîne de caractères.
-    \item \texttt{Snum Int} : Représente un entier.
-    \item \texttt{Snode Sexp [Sexp]} : Représente une liste non vide d’expressions.
-\end{itemize}
-
-\texttt{Lexp} : C’est la forme intermédiaire d’une expression après analyse syntaxique. Elle simplifie les calculs et facilite l'évaluation.
-\begin{itemize}
-    \item \texttt{Lnum Int} : Constante entière.
-    \item \texttt{Lbool Bool} : Constante booléenne.
-    \item \texttt{Lvar Var} : Référence à une variable.
-    \item \texttt{Ltest Lexp Lexp Lexp} : Expression conditionnelle (équivalente à if).
-    \item \texttt{Lfob [Var] Lexp} : Définition d'une fonction (objet fonctionnel).
-    \item \texttt{Lsend Lexp [Lexp]} : Appel de fonction avec arguments.
-    \item \texttt{Llet Var Lexp Lexp} : Déclaration locale non récursive.
-    \item \texttt{Lfix [(Var, Lexp)] Lexp} : Déclaration de variables mutuellement récursives. \newline
-\end{itemize} 
-
-\texttt{VEnv :} Une liste de paires (Var, Value) où Var est le nom d’une variable et Value est la valeur correspondante. Utilisée dans l’évaluation pour suivre les variables définies et leur portée. \newline
-
-\texttt{Value :} Représente les différentes valeurs que peut manipuler le langage lors de l’exécution.
-\begin{itemize}
-    \item \texttt{Vnum Int} : Entier.
-    \item \texttt{Vbool Bool} : Booléen.
-    \item \texttt{Vbuiltin ([Value] -> Value)} : Fonction primitive (comme + ou -).
-    \item \texttt{Vfob VEnv [Var] Lexp} : Objet fonctionnel avec un environnement.
-\end{itemize}
-
-\subsection{Fonctions principales}
-\texttt{s2l (Conversion de Sexp vers Lexp) :} La fonction s2l convertit une expression de type Sexp une expression logique Lexp. Cette conversion permet de simplifier la manipulation et l’évaluation des expressions.
-La façon dont s2l est implémenté :
-\begin{itemize}
-    \item L’analyse commence par un pattern matching sur les différentes formes de Sexp.
-    \item Si l’expression est un entier (Snum), elle est convertie en Lnum.
-    \item Si l’expression est une fonction comme "let", elle est transformée en une structure de type "Llet".
-    \item En cas de liste vide "Snil", la fonction "Lfob" est utilisée pour définir un objet fonctionnel avec une liste vide de paramètres.
-\end{itemize}
-\texttt{Exemple} : s2l (Snode (Ssym "let") [Ssym "x", Snum 2, Snode (Ssym "+") [Lvar "x", Lnum 3]])
-
-\hspace{1cm}\texttt{Résultat} : Llet "x" (Lnum 2) (Lsend (Lvar "+") [Lvar "x", Lnum 3])
-
-
 \subsection{Difficultés rencontrées et solutions}
 
 \begin{enumerate}
-    \item \texttt{Problème :} Extraction des arguments et liaisons récursives
+    \item \underline{Problème} : Extraction des arguments et liaisons récursives 
         \begin{itemize}
-            \item \texttt{Description :} Lors de la conversion avec Lfix, il a été difficile d’extraire correctement les variables et leur corps.
-            \item \texttt{Solution :} L’utilisation de fonctions auxiliaires (bindExtraction et argsExtraction) a permis de gérer efficacement les expressions imbriquées et de structurer les arguments de manière cohérente.
+            \item \textit{Description :} Au début, il était difficile d’extraire correctement les variables et 
+                                         leur corps pour \texttt{Lfix}.
+            \item \textit{Solution :} L’utilisation de fonctions auxiliaires (bindExtraction et argsExtraction) 
+                                      a permis de gérer efficacement les expressions imbriquées et de structurer 
+                                      les arguments de manière cohérente.
         \end{itemize}
         
-    \item \texttt{Problème :} Gestion de l'environnement d’exécution
+    \item \underline{Problème} : Gestion de l'environnement d’exécution
         \begin{itemize}
-            \item \texttt{Description :} Il était complexe de maintenir un suivi précis de l’environnement avec des déclarations imbriquées. Par exemple, les variables définies dans un "let" ne doivent pas affecter l’environnement global.
-            \item \texttt{Solution :} L’approche consistant à ajouter temporairement des variables dans l’environnement a permis de résoudre ce problème sans modifier les environnements globaux. L’utilisation de listes immuables pour représenter l'environnement a également facilité la gestion.
+            \item \textit{Description :} Il était complexe de maintenir un suivi précis de l’environnement avec 
+                                         des déclarations imbriquées. Par exemple, les variables définies dans un 
+                                         ``let" ne doivent pas affecter l’environnement global.
+            \item \textit{Solution :} Nous avons approché le problème en ajoutant temporairement des variables dans 
+                                      l’environnement ce qui a permis de résoudre le problème sans modifier les 
+                                      environnements globaux. L’utilisation de listes immuables pour représenter 
+                                      l'environnement a également facilité la gestion.
         \end{itemize}
-    \item \texttt{Problème :} Gestion de l'environnement d’exécution
-        \begin{itemize}
-            \item \texttt{Description :} La gestion des fonctions et objets fonctionnels définis avec Lfob posait plusieurs défis. Contrairement à un simple appel de fonction, Lfob permet de définir une fonction en capturant un environnement local (appelé closure). Cela signifie que la fonction peut être appelée plus tard avec des arguments, en se basant sur les variables définies lors de sa création. Cependant, plusieurs problèmes sont apparus :
-                \begin{enumerate}[label=\roman*.]
-                    \item \texttt{Correspondance des paramètres et arguments :} Il fallait s'assurer que le nombre de paramètres fournis lors de l’appel corresponde exactement au nombre d'arguments attendus par la fonction.
-                    \item \texttt{Gestion de l’environnement capturé :} L’environnement d’exécution lors de la définition de la fonction devait être stocké et réutilisé lorsque la fonction était appelée.
-                    \item \texttt{Appels imbriqués :} Dans certains cas, une fonction pouvait retourner une autre fonction, ce qui nécessitait une gestion des closures imbriquées.
-                    \item \texttt{Traitement des erreurs :} Une mauvaise correspondance entre les paramètres et les arguments devait être signalée immédiatement avec un message d'erreur explicite.
-                \end{enumerate}
-            \item \texttt{Solution :} 
-                \begin{enumerate}[label=\roman*.]
-                    \item \texttt{Validation du nombre d'arguments :} Lors de l’évaluation d’une fonction avec Lsend, une vérification explicite a été ajoutée pour s'assurer que le nombre d'arguments correspond au nombre de paramètres. En cas de déséquilibre, une erreur descriptive est levée:\newline
-                    \hspace*{1cm}**if length params == length args\newline
-                    \hspace*{1cm}then ...\newline
-                    \hspace*{1cm}else error ("Manque " ++ show (abs (length params - length args))\newline\hspace*{2cm} ++ " arguments.")**
 
-                    \item \texttt{Gestion de l’environnement capturé :} L’environnement d’exécution lors de la définition de la fonction devait être stocké et réutilisé lorsque la fonction était appelée.
-                    \item \texttt{Appels imbriqués :} Dans certains cas, une fonction pouvait retourner une autre fonction, ce qui nécessitait une gestion des closures imbriquées.
-                    \item \texttt{Traitement des erreurs :} Une mauvaise correspondance entre les paramètres et les arguments devait être signalée immédiatement avec un message d'erreur explicite.
+    \item \underline{Problème} : Gestion de l'environnement d’exécution
+        \begin{itemize}
+            \item \textit{Description :} La gestion des fonctions et objets fonctionnels définis avec \texttt{Lfob} posait 
+                                         plusieurs défis. Contrairement à un simple appel de fonction,\texttt{Lfob} permet 
+                                         de définir une fonction en capturant un environnement local. 
+                                         Cela signifie que la fonction peut être appelée plus tard avec des arguments
+                                         de l'environnement extérieur et en se basant sur les variables définies lors 
+                                         de sa création. Cependant, plusieurs problèmes sont survenus :
+                                        \begin{enumerate}
+                                            \item \texttt{Correspondance des paramètres et arguments :} Il fallait 
+                                                          s'assurer que le nombre de paramètres fournis lors de l’appel 
+                                                          corresponde exactement au nombre d'arguments attendus par la fonction.
+                                            \item \texttt{Gestion de l’environnement capturé :} L’environnement d’exécution 
+                                                          lors de la définition de la fonction devait être stocké et réutilisé 
+                                                          lorsque la fonction était appelée.
+                                            \item \texttt{Appels imbriqués :} Dans certains cas, une fonction pouvait retourner 
+                                                                              une autre fonction, ce qui nécessitait une gestion 
+                                                                              des closures imbriquées.
+                                            \item \texttt{Traitement des erreurs :} Une mauvaise correspondance entre les 
+                                                          paramètres et les arguments devait être signalée immédiatement 
+                                                          avec un message d'erreur explicite.
+                                        \end{enumerate}
+            \item \textit{Solution :} 
+                \begin{enumerate}
+                    \item \texttt{Validation du nombre d'arguments :} Lors de l’évaluation d’une fonction avec \texttt{Lsend}, une 
+                                  vérification explicite a été ajoutée pour s'assurer que le nombre d'arguments correspond au nombre 
+                                  de paramètres. En cas de déséquilibre, une erreur descriptive est levée:\newline
+                    \begin{lstlisting}
+if length params == length args
+    then 
+        ...
+    else error ("Manque " ++ show (abs (length params - length args)) 
+                ++ " arguments.")
+                    \end{lstlisting}
                 \end{enumerate}
         \end{itemize}
-    \item La section 5 conclut le rapport en résumant nos réalisations et en proposant des pistes d'amélioration.
 \end{enumerate}
-
-
-Je ne sais pas :(
 
 \newpage 
 \section{Exemples et tests} 
@@ -201,15 +178,25 @@ Je ne sais pas :(
 \newpage
 \section*{Extension du langage}
 \subsection*{Nouvelles fonctionnalités implémentées}
-\subsection*{Justification des choix}
+\section{Conclusion}
+En conclusion, l'implantation de Lisp nous a permis de développer un analyseur lexical et syntaxique, ainsi 
+qu'un évaluateur pour diverses expressions arithmétiques et logiques. Quelques extensions intéressantes de 
+ce travail serait d'ajouter la possibilité d'effectuer des opérations sur des "String" ou la prise en charge 
+des lambdas.
 
-\section*{Conclusion}
-\subsection*{Récapitulatif des réalisations}
-\subsection*{Perspectives d'amélioration}
+\subsection {Opétrations sur les "String"}
+Sommairement, cela pourrait être réalisé en introduisant un nouveau type de données dans notre structure "Lexp" 
+pour représenter les chaînes de caractères. Ensuite, dans la fonction d'évaluation "eval", des cas spécifiques 
+seraient ajoutés pour gérer des opérations prédéfinies sur les chaînes (concaténation, comparaison,etc). Enfin, 
+des fonctions de manipulation de chaînes pourraient être intégrées dans "env0", de la même façon nous avons procédé 
+pour les autres opérateurs.
 
-\section*{Annexes}
-\subsection*{Code source complet}
-\subsection*{Exemples supplémentaires}
+\subsection {Lambdas}
+Une autre extension intéressante serait l'ajout de la prise en charge des lambdas. En ajoutant une nouvelle construction 
+dans "Lexp" pour représenter des fonctions sans leur donner de nom, nous pourrions permettre à l'utilisateur de définir 
+des fonctions directement dans le code. Dans la fonction “eval", les lambdas seraient évaluées en tant qu'objets de fonction 
+avec des environnements de fermeture capturant les variables nécessaires. Utiliser un lambda évitera d'encombrer le code avec 
+des définitions de fonctions supplémentaires et permettera de rendre ce langage plus flexible.
 
 \end{document}
 
