@@ -195,11 +195,45 @@ data Lexp = Lnum Int             -- Constante entière.
           | Lfix [(Var, Lexp)] Lexp
           deriving (Show, Eq)
 
+s2list :: Sexp -> [Sexp]
+s2list Snil = []
+s2list (Snode se1 ses) = se1 : ses
+s2list se = error ("Pas une liste: " ++ showSexp se)
+
+svar2lvar :: Sexp -> Var
+svar2lvar (Ssym v) = v
+svar2lvar se = error ("Pas un symbole: " ++ showSexp se)
+
+s2type :: Sexp -> Type
+s2type (Ssym "Num") = Tnum
+s2type (Ssym "Bool") = Tbool
+s2type (Snode (Ssym "fob") [argTypes, retType]) =
+  Tfob (map s2type (s2list argTypes)) (s2type retType)
+s2type se = error ("Type inconnu : " ++ showSexp se)
+
 -- Première passe simple qui analyse une Sexp et construit une Lexp équivalente.
 s2l :: Sexp -> Lexp
 s2l (Snum n) = Lnum n
 s2l (Ssym s) = Lvar s
--- ¡¡COMPLÉTER ICI!!
+s2l (Snode (Ssym "if") [e1, e2, e3])
+  = Ltest (s2l e1) (s2l e2) (s2l e3)
+s2l (Snode (Ssym "fob") [args, body])
+  = Lfob (map argToTuple (s2list args)) (s2l body)
+  where
+    argToTuple :: Sexp -> (Var, Type)
+    argToTuple (Snode (Ssym v) [t]) = (v, s2type t) -- Variable avec type
+    argToTuple se = error ("Argument de fob invalide : " ++ showSexp se)
+s2l (Snode (Ssym "let") [x, e1, e2])
+  = Llet (svar2lvar x) (s2l e1) (s2l e2)
+s2l (Snode (Ssym "fix") [decls, body])
+  = let sdecl2ldecl :: Sexp -> (Var, Lexp)
+        sdecl2ldecl (Snode (Ssym v) [e]) = (v, (s2l e))
+        sdecl2ldecl (Snode (Snode (Ssym v) args) [e])
+          = (v, Lfob (map svar2lvar args) (s2l e))
+        sdecl2ldecl se = error ("Declation Psil inconnue: " ++ showSexp se)
+    in Lfix (map sdecl2ldecl (s2list decls)) (s2l body)
+s2l (Snode f args)
+  = Lsend (s2l f) (map s2l args)
 s2l se = error ("Expression Psil inconnue: " ++ showSexp se)
 
 ---------------------------------------------------------------------------
