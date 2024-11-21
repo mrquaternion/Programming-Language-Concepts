@@ -211,6 +211,10 @@ s2type (Snode (Ssym "fob") [argTypes, retType]) =
   Tfob (map s2type (s2list argTypes)) (s2type retType)
 s2type se = error ("Type inconnu : " ++ showSexp se)
 
+argToTuple :: Sexp -> (Var, Type)
+argToTuple (Snode (Ssym v) [t]) = (v, s2type t) -- Argument avec son type
+argToTuple se = error ("Argument invalide dans fix : " ++ showSexp se)
+
 -- Première passe simple qui analyse une Sexp et construit une Lexp équivalente.
 s2l :: Sexp -> Lexp
 s2l (Snum n) = Lnum n
@@ -219,18 +223,14 @@ s2l (Snode (Ssym "if") [e1, e2, e3])
   = Ltest (s2l e1) (s2l e2) (s2l e3)
 s2l (Snode (Ssym "fob") [args, body])
   = Lfob (map argToTuple (s2list args)) (s2l body)
-  where
-    argToTuple :: Sexp -> (Var, Type)
-    argToTuple (Snode (Ssym v) [t]) = (v, s2type t) -- Variable avec type
-    argToTuple se = error ("Argument de fob invalide : " ++ showSexp se)
 s2l (Snode (Ssym "let") [x, e1, e2])
   = Llet (svar2lvar x) (s2l e1) (s2l e2)
 s2l (Snode (Ssym "fix") [decls, body])
   = let sdecl2ldecl :: Sexp -> (Var, Lexp)
-        sdecl2ldecl (Snode (Ssym v) [e]) = (v, (s2l e))
+        sdecl2ldecl (Snode (Ssym v) [e]) = (v, s2l e) -- Déclaration simple
         sdecl2ldecl (Snode (Snode (Ssym v) args) [e])
-          = (v, Lfob (map svar2lvar args) (s2l e))
-        sdecl2ldecl se = error ("Declation Psil inconnue: " ++ showSexp se)
+          = (v, Lfob (map argToTuple args) (s2l e)) -- Déclaration avec arguments
+        sdecl2ldecl se = error ("Déclaration inconnue dans fix : " ++ showSexp se)
     in Lfix (map sdecl2ldecl (s2list decls)) (s2l body)
 s2l (Snode f args)
   = Lsend (s2l f) (map s2l args)
