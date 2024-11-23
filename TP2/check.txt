@@ -1,0 +1,118 @@
+---------------------------------------------------------------------------
+-- Vérification des types                                                --
+---------------------------------------------------------------------------
+
+type TEnv = [(Var, Type)]
+
+-- `check c Γ e` renvoie le type de `e` dans l'environnement `Γ`.
+-- Si `c` est vrai, on fait une vérification complète, alors que s'il
+-- est faux, alors on présume que le code est typé correctement et on
+-- se contente de chercher le type.
+
+-- *** Probablement utile pour le rapport :  On veut écrire une fonction pour vérifier le typage de façon statique 
+-- dans le langage SSlip. Elle traduit les règles théoriques en une implémentation pratique, nous obligeant à comprendre, 
+-- formaliser et appliquer les concepts de typage et d’analyse syntaxique en Haskell. La fonction "check" est utilisée pour 
+-- vérifier le typage des expressions dans le langage SSlip. Elle prend une expression (Lexp), un environnement de typage (TEnv), 
+-- et détermine si cette expression est correctement typée selon les règles de typage définies (Figure 2). Si l’expression est valide,
+-- elle renvoie son type (Type), sinon, elle retourne une erreur (Terror) expliquant le problème. Cela garantit que les programmes 
+-- écrits en SSlip respectent les règles du typage statique avant leur exécution. ***
+
+check :: Bool -> TEnv -> Lexp -> Type
+
+-- Constantes (déjà donné par le prof)
+check _ _ (Lnum _) = Tnum
+check _ _ (Lbool _) = Tbool
+
+    -- Tester le code :
+        -- check True [] (Lnum 42) -- Résultat attendu : Tnum
+        -- check True [] (Lbool True) -- Résultat attendu : Tbool
+        -- check True [] (Lbool False) -- Résultat attendu : Tbool
+
+-- Variables
+check _ env (Lvar x) =
+    case lookup x env of
+        Just t -> t
+        Nothing -> Terror ("Variable inconnue: " ++ x)
+
+    -- Tester le code : 
+        -- check True [("x", Tnum)] (Lvar "x") -- Résultat attendu : Tnum
+        -- check True [("y", Tbool)] (Lvar "y") -- Résultat attendu : Tbool
+        -- check True [] (Lvar "z") -- Résultat attendu : Terror "Variable inconnue: z"
+
+-- Annotation de type (: e τ)
+check True env (Ltype e τ) =
+    let t = check True env e
+    in if t == τ then τ else Terror ("Type mismatch: attendu " ++ show τ ++ ", obtenu " ++ show t)
+check False _ (Ltype _ τ) = τ -- On présume que le type est correct avec `False`.
+
+    -- Tester le code :
+        -- check True [] (Ltype (Lnum 42) Tnum) -- Résultat attendu : Tnum
+        -- check True [] (Ltype (Lnum 42) Tbool) -- Résultat attendu : Terror "Type mismatch: attendu Tbool, obtenu Tnum"
+        -- check False [] (Ltype (Lnum 42) Tnum) -- Résultat attendu : Tnum (ignore la vérification)
+
+-- Expression conditionnelle (if e1 e2 e3)
+check True env (Ltest e1 e2 e3) =
+    case check True env e1 of
+        Tbool ->
+            let t2 = check True env e2
+                t3 = check True env e3
+            in if t2 == t3 then t2 else Terror "Branches de if de types differents"
+        _ -> Terror "Condition de if n'est pas un booléen"
+
+    -- Tester le code :
+        -- check True [] (Ltest (Lbool True) (Lnum 42) (Lnum 0)) -- Résultat attendu : Tnum
+        -- check True [] (Ltest (Lbool True) (Lbool True) (Lbool False)) -- Résultat attendu : Tbool
+        -- check True [] (Ltest (Lnum 42) (Lnum 1) (Lnum 2)) -- Résultat attendu : Terror "Condition de if n'est pas un booléen"
+        -- check True [] (Ltest (Lbool True) (Lnum 1) (Lbool True)) -- Résultat attendu : Terror "Branches de if de types différents"
+
+-- Appel de fonction (e0 e1 ... en)
+check True env (Lsend f args) =
+    case check True env f of
+        Tfob argTypes returnType ->
+            if length args == length argTypes
+            then 
+                let argChecks = zipWith (\arg expectedType -> check True env arg == expectedType) args argTypes
+                in if all id argChecks
+                    then returnType
+                    else Terror ("Types des arguments incorrects dans Lsend: " ++ show args ++ " attendu: " ++ show argTypes)
+            else Terror ("Nombre d'arguments incorrect pour Lsend : attendu " ++ show (length argTypes) ++ ", obtenu " ++ show (length args))
+        t -> Terror ("Expression appelée n'est pas une fonction, type obtenu : " ++ show t)
+    -- Tester le code :
+        -- check True [("f", Tfob [Tnum, Tnum] Tnum)] (Lsend (Lvar "f") [Lnum 1, Lnum 2]) -- Résultat attendu : Tnum
+        -- check True [("g", Tfob [Tnum] Tbool)] (Lsend (Lvar "g") [Lnum 42]) -- Résultat attendu : Tbool
+        -- check True [("f", Tfob [Tnum, Tnum] Tnum)] (Lsend (Lvar "f") [Lnum 1]) -- Résultat attendu : Terror "Nombre d'arguments incorrect"
+        -- check True [("f", Tfob [Tnum, Tbool] Tnum)] (Lsend (Lvar "f") [Lnum 1, Lnum 2]) -- Résultat attendu : Terror "Types des arguments incorrects"
+        -- check True [] (Lsend (Lvar "notAFunc") [Lnum 1]) -- Résultat attendu : Terror "Expression appelée n'est pas une fonction"
+
+-- Déclaration de fonction fob ((x1 τ1) ... (xn τn)) e
+check True env (Lfob args body) =
+    let argEnv = [(x, t) | (x, t) <- args] -- Arguments enrichis
+        fullEnv = argEnv ++ env -- Environnement complet
+    in case check True fullEnv body of
+        Terror msg -> Terror ("Erreur dans le corps de Lfob : " ++ msg)
+        t -> Tfob (map snd args) t -- Retourne le type de la fonction
+    -- Tester le code :
+        --  check True [] (Llet "x" (Lnum 42) (Lvar "x")) -- Résultat attendu : Tnum
+        -- check True [] (Llet "x" (Lbool True) (Ltest (Lvar "x") (Lnum 1) (Lnum 0))) -- Résultat attendu : Tnum
+        -- check True [] (Llet "x" (Lbool True) (Lsend (Lvar "+") [Lvar "x", Lnum 42])) -- Résultat attendu : Terror "Types des arguments incorrects"
+
+-- Déclaration locale let x e1 e2
+check True env (Llet x e1 e2) =
+    let t1 = check True env e1
+    in check True ((x, t1) : env) e2
+
+-- Déclarations récursives fix ((x1 e1) ... (xn en)) e
+check True env (Lfix decls body) =
+    let invalidEnv = [(x, Tfob [] (Terror "Type inconnu")) | (x, _) <- decls]
+        guessedEnv = map (\(x, e) -> (x, check False (invalidEnv ++ env) e)) decls
+        fullEnv = guessedEnv ++ env
+        verifyDecls = all (\(x, e) -> trace ("Checking declaration " ++ x) (check True fullEnv e /= Terror "Expression inconnue")) decls
+    in if all (\(_, t) -> t /= Terror "Type inconnu") guessedEnv
+       then if verifyDecls
+            then trace ("Checking body with fullEnv: " ++ show fullEnv) (check True fullEnv body)
+            else Terror "Erreur dans les déclarations récursives"
+       else Terror "Impossible de deviner les types pour fix"
+-- Cas par défaut pour signaler une expression inconnue
+
+check c env expr =
+    trace ("Default case reached: " ++ show expr) (Terror "Expression inconnue")
