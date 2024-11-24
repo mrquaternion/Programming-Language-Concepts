@@ -195,11 +195,21 @@ data Lexp = Lnum Int             -- Constante entière.
 s2l :: Sexp -> Lexp
 s2l (Snum n) = Lnum n
 s2l (Ssym s) = Lvar s
-s2l (Ssym "true") = Lbool True -- reconnaissance du symbole True
-s2l (Ssym "false") = Lbool False -- reconnaissance du symbole False
-s2l Snil = Lfob [] (Lvar "vide") -- gestion de liste vide
+
+-- Reconnaissance du symbole "true"
+s2l (Ssym "true") = Lbool True 
+
+-- Reconnaissance du symbole "false"
+s2l (Ssym "false") = Lbool False 
+
+-- Gestion de la liste vide
+s2l Snil = Lfob [] (Lvar "vide") 
+
+-- Conversion d'une expression let
 s2l (Snode (Ssym "let") [Ssym var, val, body]) = 
-    Llet var (s2l val) (s2l body) -- this work
+    Llet var (s2l val) (s2l body)
+
+-- Conversion d'une expression fix
 s2l (Snode (Ssym "fix") [bindings, body]) = 
     Lfix (bindsExtraction bindings) (s2l body)
     where
@@ -210,11 +220,12 @@ s2l (Snode (Ssym "fix") [bindings, body]) =
             error "Structure de la liste de liaisons invalide dans fix."
 
         bindExtraction :: Sexp -> (Var, Lexp)
-        -- cas à 3 imbrications
+        -- Cas à 3 imbrications
         bindExtraction (Snode (Snode (Ssym var) [args]) [newBody]) =
             (var, Lfob (argsExtraction args) (s2l newBody)) 
-        -- cas à 2 imbrications
-        bindExtraction (Snode (Ssym var) [newBody]) = (var, (s2l newBody))
+        -- Cas à 2 imbrications
+        bindExtraction (Snode (Ssym var) [newBody]) = 
+            (var, (s2l newBody))
         bindExtraction _ = error "Structure de liaison invalide dans fix."
 
         argsExtraction :: Sexp -> [Var]
@@ -228,11 +239,11 @@ s2l (Snode (Ssym "fix") [bindings, body]) =
                             myMap f (arg2 : rest2) = f arg2 ++ myMap f rest2 
         argsExtraction _ = error "Structure d'arguments invalide dans fix."
 
-
+-- Gestion des expressions fob
 s2l (Snode (Ssym "fob") [vars, body]) = Lfob (vsExtraction vars) (s2l body)
     where
         vsExtraction :: Sexp -> [Var]
-        vsExtraction Snil = [] -- si la fonction ne prend pas d'argument
+        vsExtraction Snil = [] -- Pas d'arguments
         vsExtraction (Snode hd tl) = vExtraction hd : vsExtraction' tl
         vsExtraction _ = error "Liste de variables invalide dans fob."
 
@@ -243,14 +254,13 @@ s2l (Snode (Ssym "fob") [vars, body]) = Lfob (vsExtraction vars) (s2l body)
         vExtraction :: Sexp -> Var
         vExtraction (Ssym var) = var
         vExtraction _ = error "Variable invalide dans fob."
+
+-- Conversion d'une expression conditionnelle if
 s2l (Snode (Ssym "if") [cond, thenExp, elseExp]) = 
-    Ltest (s2l cond) (s2l thenExp) (s2l elseExp) -- this work
-s2l (Snode op args) = Lsend (s2l op) (map s2l args) -- gestion des opérateurs
+    Ltest (s2l cond) (s2l thenExp) (s2l elseExp)
 
-
-
-
--- ¡¡COMPLÉTER ICI!!
+-- Gestion des opérateurs et des appels de fonctions
+s2l (Snode op args) = Lsend (s2l op) (map s2l args)
 s2l se = error ("Expression Psil inconnue: " ++ showSexp se)
 
 ---------------------------------------------------------------------------
@@ -296,11 +306,12 @@ env0 = let binop f op =
 ---------------------------------------------------------------------------
 
 eval :: VEnv -> Lexp -> Value
--- ¡¡ COMPLETER !!
 eval _ (Lnum n) = Vnum n
-eval _ (Lbool b) = Vbool b -- reconnaissance d'un boolean
+eval _ (Lbool b) = Vbool b 
+
+-- Source : 2e devoir
 eval env (Lvar var) =
-    case elookup env var of -- source : devoir 2
+    case elookup env var of 
         Just v -> v
         Nothing -> error ("Variable " ++ var ++ " non définie.")
         where
@@ -309,16 +320,24 @@ eval env (Lvar var) =
             elookup ((var', val') : restEnv) currVar
                 | currVar == var' = Just val'
                 | otherwise = elookup restEnv currVar
+
+-- Évaluation d'une expression let
 eval env (Llet var val body) =
     let newEnv = (var, eval env val) : env
     in eval newEnv body
+
+-- Évaluation d'une expression fix pour les liaisons récursives
 eval env (Lfix bindings body) =
     let newEnv = [(var, eval newEnv expr) | (var, expr) <- bindings] ++ env
     in eval newEnv body
+
+-- Évaluation d'une fonction fob
 eval env (Lfob params body) = Vfob env params body
+
+-- Appel de fonction ou opérateur avec évaluation des arguments
 eval env (Lsend func args) =
     case eval env func of
-        Vfob closureEnv params body -> -- pattern utilisé par Lfob
+        Vfob closureEnv params body -> -- Pattern utilisé par Lfob
             if length params == length args
                 then
                     let argVals = map (eval env) args
@@ -332,8 +351,10 @@ eval env (Lsend func args) =
                         myZip _ [] = []
                         myZip [] _ = []
                         myZip (x:xs) (y:ys) = (x,y) : myZip xs ys
-        Vbuiltin f -> f (map (eval env) args) -- pattern utilisé par Lfix, Llet
+        Vbuiltin f -> f (map (eval env) args) -- Pattern utilisé par Lfix, Llet
         _ -> error "N'est pas une fonction."
+
+-- Évaluation d'une expression conditionnelle if
 eval env (Ltest cond thenExp elseExp) =
     case eval env cond of
         Vbool True  -> eval env thenExp
@@ -369,67 +390,3 @@ lexpOf = s2l . sexpOf
 
 valOf :: String -> Value
 valOf = evalSexp . sexpOf
-
-
--- ### TESTING HERE ###
--- fonctionne
-tests2l1 :: Lexp
-tests2l1 = s2l (readSexp "(let x 2 (let y 3 (+ x y)))")
-
-testeval1 :: Value
-testeval1 = eval env0 tests2l1
-
--- fonctionne 
-tests2l2 :: Lexp
-tests2l2 = s2l (readSexp "(fix ((x 2) (y 3)) (+ x y))")
-
-testeval2 :: Value
-testeval2 = eval env0 tests2l2
-
--- fonctionne 
-tests2l3 :: Lexp
-tests2l3 = s2l (readSexp "((fob (x) x) 2)")
-
-testeval3 :: Value
-testeval3 = eval env0 tests2l3
-
--- Test de la fonction fob 
-tests2l4_1 :: Lexp
-tests2l4_1 = s2l (readSexp "(((fob (x) (fob (y) (* x y))) 3) 5)")
-
-testeval4_1 :: Value
-testeval4_1 = eval env0 tests2l4_1
-
--- Test d'erreur par omission du 2e argument
-tests2l4_2 :: Lexp
-tests2l4_2 = s2l (readSexp "(((fob (x) (fob (y) (* x y))) 3) )")
-
-testeval4_2 :: Value
-testeval4_2 = eval env0 tests2l4_2
-
-tests2l5 :: Lexp
-tests2l5 = s2l (readSexp "(fix (((even x) (if (= x 0) true  (odd  (- x 1)))) ((odd x) (if (= x 0) false (even (- x 1))))) (odd 42))")
-
-testeval5 :: Value
-testeval5 = eval env0 tests2l5
-
--- Test pour la fonction fob sans arguments
-tests2l6 :: Lexp
-tests2l6 = s2l (readSexp "(fob () 42)")
-
-testeval6 :: Value
-testeval6 = eval env0 tests2l6 -- devrait retourner <fobjet>
-
--- Test pour appel de la fonction fob sans arguments
-tests2l7 :: Lexp
-tests2l7 = s2l (readSexp "((fob () 42))")
-
-testeval7 :: Value
-testeval7 = eval env0 tests2l7
-
--- Test pour appel de la fonction fob avec conditionnement
-tests2l8 :: Lexp
-tests2l8 = s2l (readSexp "((fob (x) (if (= x 5) true false)) 5)")
-
-testeval8 :: Value
-testeval8 = eval env0 tests2l8

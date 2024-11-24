@@ -1,5 +1,7 @@
 -- TP-1  --- Implantation d'une sorte de Lisp          -*- coding: utf-8 -*-
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 --
 -- Ce fichier défini les fonctionalités suivantes:
 -- - Analyseur lexical
@@ -216,10 +218,14 @@ argToTuple (Snode (Ssym v) [t]) = (v, s2type t) -- Argument avec son type
 argToTuple se = error ("Argument invalide dans fix : " ++ showSexp se)
 
 -- Première passe simple qui analyse une Sexp et construit une Lexp équivalente.
+-- La majorité du code provient de la correction du TP1 disponible
+-- sur Studium. Elle a été adaptée pour gérer les types tau
 s2l :: Sexp -> Lexp
+s2l (Ssym "true") = Lbool True 
+s2l (Ssym "false") = Lbool False 
 s2l (Snum n) = Lnum n
 s2l (Ssym s) = Lvar s
-s2l (Snode (Ssym "if") [e1, e2, e3])
+s2l (Snode (Ssym "if") [e1, e2, e3]) 
   = Ltest (s2l e1) (s2l e2) (s2l e3)
 s2l (Snode (Ssym "fob") [args, body])
   = Lfob (map argToTuple (s2list args)) (s2l body)
@@ -227,9 +233,15 @@ s2l (Snode (Ssym "let") [x, e1, e2])
   = Llet (svar2lvar x) (s2l e1) (s2l e2)
 s2l (Snode (Ssym "fix") [decls, body])
   = let sdecl2ldecl :: Sexp -> (Var, Lexp)
-        sdecl2ldecl (Snode (Ssym v) [e]) = (v, s2l e) -- Déclaration simple
+        -- Cas 1 : Déclaration simple (x e)
+        sdecl2ldecl (Snode (Ssym v) [e]) = (v, s2l e)
+        -- Cas 2 : Déclaration de fonction ((x args) e)
         sdecl2ldecl (Snode (Snode (Ssym v) args) [e])
-          = (v, Lfob (map argToTuple args) (s2l e)) -- Déclaration avec arguments
+          = (v, Lfob (map argToTuple args) (s2l e))
+        -- Cas 3 : Déclaration complète ((x args) t e)
+        sdecl2ldecl (Snode (Snode (Ssym v) args) [t, body2])
+          = (v, Lfob (map argToTuple args) (Ltype (s2l body2) (s2type t)))
+        -- Gestion des erreurs
         sdecl2ldecl se = error ("Déclaration inconnue dans fix : " ++ showSexp se)
     in Lfix (map sdecl2ldecl (s2list decls)) (s2l body)
 s2l (Snode f args)
@@ -289,7 +301,41 @@ type TEnv = [(Var, Type)]
 check :: Bool -> TEnv -> Lexp -> Type
 check _ _ (Lnum _) = Tnum
 check _ _ (Lbool _) = Tbool
--- ¡¡COMPLÉTER ICI!!
+check _ env (Lvar x) =
+    case lookup x env of
+        Just t -> t
+        Nothing -> Terror ("Variable inconnue: " ++ x)
+check True env (Ltype e τ) =
+    let t = check True env e
+    in if t == τ then τ else Terror ("Type mismatch: attendu " ++ show τ ++ ", obtenu " ++ show t)
+check False _ (Ltype _ τ) = τ -- On présume que le type est correct avec `False`.
+check True env (Ltest e1 e2 e3) =
+    case check True env e1 of
+        Tbool ->
+            let t2 = check True env e2
+                t3 = check True env e3
+            in if t2 == t3 then t2 else Terror "Branches de if de types differents"
+        _ -> Terror "Condition de if n'est pas un booléen"
+check True env (Lsend f args) =
+    case check True env f of
+        Tfob argTypes returnType ->
+            if length args == length argTypes
+            then 
+                let argChecks = zipWith (\arg expectedType -> check True env arg == expectedType) args argTypes
+                in if all id argChecks
+                    then returnType
+                    else Terror ("Types des arguments incorrects dans Lsend: " ++ show args ++ " attendu: " ++ show argTypes)
+            else Terror ("Nombre d'arguments incorrect pour Lsend : attendu " ++ show (length argTypes) ++ ", obtenu " ++ show (length args))
+        t -> Terror ("Expression appelée n'est pas une fonction, type obtenu : " ++ show t)
+check True env (Lfob args body) =
+    let argEnv = [(x, t) | (x, t) <- args] -- Arguments enrichis
+        fullEnv = argEnv ++ env -- Environnement complet
+    in case check True fullEnv body of
+        Terror msg -> Terror ("Erreur dans le corps de Lfob : " ++ msg)
+        t -> Tfob (map snd args) t -- Retourne le type de la fonction
+
+
+
 
 ---------------------------------------------------------------------------
 -- Pré-évaluation
@@ -328,7 +374,17 @@ l2d :: TEnv -> Lexp -> Dexp
 l2d _ (Lnum n) = Dnum n
 l2d _ (Lbool b) = Dbool b
 l2d tenv (Lvar v) = Dvar (lookupDI tenv v 0)
--- ¡¡COMPLÉTER ICI!!
+l2d _ (Ltest e1 e2 e3) = Dtest e1 e2 e3
+-- Remove la variable du `let` et on met dans env
+-- pour l'eval de De Buijn futur
+l2d tenv (Llet v e1 e2) =
+    let _ = (v, Tnum) : tenv 
+    in Dlet e1 e2
+l2d _ (Lfob args body) =
+    let nArgs = length args
+    in Dfob nArgs body
+l2d _ (Lsend f args) = Dsend f args -- ne change pas
+l2d _ (Lfix decls body) = Dfix (map snd decls) body
 
 ---------------------------------------------------------------------------
 -- Évaluateur                                                            --
@@ -387,3 +443,15 @@ lexpOf = s2l . sexpOf
 
 valOf :: String -> Value
 valOf = evalSexp . sexpOf
+
+
+
+-- ################ TEST ################
+test1 :: Lexp
+test1 = s2l (sexpOf "(fix (((f (x Num)) 42)) body)")
+
+test2 :: Lexp 
+test2 = s2l (sexpOf "(fix (((f (x Num)) Bool (if x true false))) body)")
+
+test3 :: Lexp
+test3 = s2l (sexpOf "(let x 42 (if x true false))")

@@ -15,7 +15,7 @@
 }
 
 
-\title{Rapport TP1 - Langage SLIP}
+\title{Rapport TP1}
 \author{Mathias La Rochelle \& Michel Lamothe}
 \date{Le samedi 29 septembre 2024}
 
@@ -27,24 +27,15 @@
 
 \section{Introduction}
 \subsection{Objectifs du TP}
-Afin d'avoir une session interactive sur GHCi avec aucuns avertissements et aucunes exceptions, nous allons devoir compléter les fonctions \textit{s2l} et \textit{eval}. Nous devons également écrire le code d'au moins 5 tests dans un fichier \texttt{tests.slip}. Tout doit bien s'exécuter évidemment. \\
+Afin d'avoir une session interactive sur GHCi avec aucuns avertissements et aucunes exceptions, 
+nous allons devoir compléter les fonctions \textit{s2l} et \textit{eval}. Nous devons également 
+écrire le code d'au moins 5 tests dans un fichier \texttt{tests.slip}. Tout doit bien s'exécuter 
+évidemment. \\
 
-\subsection{Présentation du langage SLIP}
-Le langage SLIP est un langage qui se rapproche fortement de la famille de langages Lisp. Il s'agit d'un langage fonctionnel conçu pour être simple et expressif, tout en conservant certaines caractéristiques clés de Lisp. SLIP utilise une syntaxe basée sur les expressions S. Nous allons explorer en profondeur le fonctionnement interne de SLIP en implémentant ses composants essentiels.
-
-\subsection{Structure du rapport}
-Ce rapport est organisé de la manière suivante :
-\begin{itemize}
-    \item La section 2 présente l'implémentation des fonctions principales, notamment \textit{s2l} et \textit{eval}.
-    \item La section 3 détaille les exemples et les tests réalisés pour valider notre implémentation.
-    \item La section 4 discute des difficultés rencontrées et des solutions apportées.
-    \item La section 5 conclut le rapport en résumant nos réalisations et en proposant des pistes d'amélioration.
-\end{itemize}
-
-Tout au long de ce rapport, nous mettrons en évidence les concepts clés du langage SLIP et les choix d'implémentation effectués pour répondre aux exigences du TP. \\
+Tout au long de ce rapport, nous mettrons en évidence les concepts clés du langage SLIP et les 
+choix d'implémentation effectués pour répondre aux exigences du TP. 
 
 \subsection{Difficultés rencontrées et solutions}
-
 \begin{enumerate}
     \item \underline{Problème} : Extraction des arguments et liaisons récursives 
         \begin{itemize}
@@ -88,6 +79,7 @@ Tout au long de ce rapport, nous mettrons en évidence les concepts clés du lan
                                                           paramètres et les arguments devait être signalée immédiatement 
                                                           avec un message d'erreur explicite.
                                         \end{enumerate}
+            \newpage
             \item \textit{Solution :} 
                 \begin{enumerate}
                     \item \texttt{Validation du nombre d'arguments :} Lors de l’évaluation d’une fonction avec \texttt{Lsend}, une 
@@ -104,7 +96,6 @@ if length params == length args
         \end{itemize}
 \end{enumerate}
 
-\newpage 
 \section{Exemples et tests} 
 \subsection{Cas de test simples} 
 \subsubsection*{Test 1 : Fonction sans paramètre} 
@@ -113,7 +104,7 @@ if length params == length args
     (fob () 42)) 
 \end{verbatim} 
 \hspace{.5cm}\textbf{Explications :} 
-\begin{itemize} 
+\begin{itemize}[left=1cm] 
     \item Teste la création et l'appel d'une fonction sans paramètre. 
     \item Vérifie que la fonction retourne bien la valeur 42. 
 \end{itemize}
@@ -123,7 +114,7 @@ if length params == length args
     ((fob (x) (if (= x 5) true false)) 5) 
 \end{verbatim} 
 \hspace{.5cm}\textbf{Explications :} 
-\begin{itemize} 
+\begin{itemize}[left=1cm] 
     \item Teste une fonction qui prend un paramètre. 
     \item Vérifie si le paramètre vaut 5 pour retourner \texttt{true}, sinon \texttt{false}. 
 \end{itemize}
@@ -133,7 +124,7 @@ if length params == length args
     (let x 5 ((fob (x) (+ x 3)) x)) 
 \end{verbatim} 
 \hspace{.5cm}\textbf{Explications :} 
-\begin{itemize} 
+\begin{itemize}[left=1cm] 
     \item Déclare une variable \texttt{x} locale avec la valeur 5. 
     \item Appelle une fonction qui ajoute 3 à \texttt{x} et retourne le résultat. 
 \end{itemize}
@@ -148,7 +139,7 @@ if length params == length args
          (fact 5)) 
 \end{verbatim} 
 \hspace{.5cm}\textbf{Explications :} 
-\begin{itemize} 
+\begin{itemize}[left=1cm]
     \item Teste la récursion pour calculer la factorielle de 5. 
     \item Vérifie que la base de récursion (\texttt{n = 0}) retourne 1. 
 \end{itemize}
@@ -159,44 +150,24 @@ if length params == length args
                 (if (= volume 16) true false))
 \end{verbatim} 
 \hspace{.5cm}\textbf{Explications :} 
-\begin{itemize} 
+\begin{itemize}[left=1cm]
     \item Teste une fonction imbriquée prenant trois paramètres (\texttt{x}, \texttt{y}, \texttt{z}). 
     \item Calcule \texttt{volume} et vérifie si la valeur obtenue est 16. 
 \end{itemize}
-%\subsection{Analyse des résultats}
-%\subsubsection*{Résumé des concepts couverts}
-%\begin{enumerate}
-%\item \texttt{Lnum} et \texttt{Lbool} : Testés implicitement dans les tests 1, 2, 3, et 5.
-%\item \texttt{Lvar} : Testé dans le test 1 avec l'accès à la variable x.
-%\item \texttt{Llet} : Déclaration de variable locale, testée dans le test 1.
-%\item \texttt{Lfob} et \texttt{Lsend} : Gestion des fonctions avec ou sans paramètres, testées dans les tests 4 et 5.
-%\item \texttt{Ltest} : Conditions avec if, testées dans le test 2 et la récursion (test 3).
-%\item \texttt{Lfix} : Gestion de la récursivité, testée dans le test 3.
-%\item Appels imbriqués et environnements : Testés dans les tests 4 et 5.
-%\end{enumerate}
 
-\newpage
-\section*{Extension du langage}
-\subsection*{Nouvelles fonctionnalités implémentées}
-\section{Conclusion}
-En conclusion, l'implantation de Lisp nous a permis de développer un analyseur lexical et syntaxique, ainsi 
-qu'un évaluateur pour diverses expressions arithmétiques et logiques. Quelques extensions intéressantes de 
-ce travail serait d'ajouter la possibilité d'effectuer des opérations sur des "String" ou la prise en charge 
-des lambdas.
+\section{Extension du langage}
+\subsection{Nouvelles fonctionnalités implémentées}
+\subsubsection*{Variable contenant des chaînes de caractères et opérations sur elles}
+Pour intégrer la gestion des chaînes de caractères, il serait pertinent d'ajouter un nouveau type de données dans notre structure Lexp pour représenter les chaînes. Dans la fonction d'évaluation ``eval", il conviendrait d'ajouter des cas spécifiques pour traiter les opérations prédéfinies sur les chaînes comme la concaténation et la comparaison. Des fonctions de manipulation des chaînes pourraient aussi être incorporées dans ``env0", de manière similaire à l'intégration des autres opérateurs.
 
-\subsection {Opétrations sur les "String"}
-Sommairement, cela pourrait être réalisé en introduisant un nouveau type de données dans notre structure "Lexp" 
-pour représenter les chaînes de caractères. Ensuite, dans la fonction d'évaluation "eval", des cas spécifiques 
-seraient ajoutés pour gérer des opérations prédéfinies sur les chaînes (concaténation, comparaison,etc). Enfin, 
-des fonctions de manipulation de chaînes pourraient être intégrées dans "env0", de la même façon nous avons procédé 
-pour les autres opérateurs.
-
-\subsection {Lambdas}
-Une autre extension intéressante serait l'ajout de la prise en charge des lambdas. En ajoutant une nouvelle construction 
-dans "Lexp" pour représenter des fonctions sans leur donner de nom, nous pourrions permettre à l'utilisateur de définir 
-des fonctions directement dans le code. Dans la fonction “eval", les lambdas seraient évaluées en tant qu'objets de fonction 
+\subsubsection*{Les fonctions anonymes lambda}
+Une autre extension intéressante serait l'ajout de la prise en charge des lambdas. En ajoutant une nouvelle construction dans ``Lexp" pour représenter des fonctions sans leur donner de nom, nous pourrions permettre à l'utilisateur de définir des fonctions directement dans le code. Dans la fonction d'évaluation ``eval", les lambdas seraient évalués en tant qu'objets de fonction 
 avec des environnements de fermeture capturant les variables nécessaires. Utiliser un lambda évitera d'encombrer le code avec 
 des définitions de fonctions supplémentaires et permettera de rendre ce langage plus flexible.
+
+\section{Conclusion}
+En conclusion, l'implantation de Lisp nous a permis de développer un analyseur lexical et syntaxique, ainsi 
+qu'un évaluateur pour diverses expressions arithmétiques et logiques. À noter que ce fichier \LaTeX\ compile également sur \texttt{ens.iro} par SSH.
 
 \end{document}
 
