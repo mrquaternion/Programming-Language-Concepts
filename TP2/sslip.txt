@@ -375,7 +375,6 @@ l2d :: TEnv -> Lexp -> Dexp
 l2d _ (Lnum n) = Dnum n
 l2d _ (Lbool b) = Dbool b
 l2d tenv (Lvar v) = Dvar (lookupDI tenv v 0)
-l2d tenv (Ltype e _) = l2d tenv e
 l2d tenv (Ltest e1 e2 e3) =
     Dtest (l2d tenv e1) (l2d tenv e2) (l2d tenv e3)
 -- Remove la variable du `let` et on met dans env
@@ -397,9 +396,7 @@ l2d tenv (Lsend func args) =
         args' = map (l2d tenv) args
     in Dsend func' args'
 l2d tenv (Lfix decls body) = 
-    let -- Créer le nouvel environnement avec les types (pour les variables récursives)
-        newEnv = [(v, t) | (v, e) <- decls, let t = check True tenv e] ++ tenv
-        -- Convertir les expressions des déclarations
+    let newEnv = [(v, t) | (v, Ltype _ t) <- decls] ++ tenv
         decls' = map (\(_, e) -> l2d newEnv e) decls
     in Dfix decls' (l2d newEnv body)
 
