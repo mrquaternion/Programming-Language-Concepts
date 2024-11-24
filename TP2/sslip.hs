@@ -221,11 +221,11 @@ argToTuple se = error ("Argument invalide dans fix : " ++ showSexp se)
 -- La majorité du code provient de la correction du TP1 disponible
 -- sur Studium. Elle a été adaptée pour gérer les types tau
 s2l :: Sexp -> Lexp
-s2l (Ssym "true") = Lbool True 
-s2l (Ssym "false") = Lbool False 
+s2l (Ssym "true") = Lbool True
+s2l (Ssym "false") = Lbool False
 s2l (Snum n) = Lnum n
 s2l (Ssym s) = Lvar s
-s2l (Snode (Ssym "if") [e1, e2, e3]) 
+s2l (Snode (Ssym "if") [e1, e2, e3])
   = Ltest (s2l e1) (s2l e2) (s2l e3)
 s2l (Snode (Ssym "fob") [args, body])
   = Lfob (map argToTuple (s2list args)) (s2l body)
@@ -320,7 +320,7 @@ check True env (Lsend f args) =
     case check True env f of
         Tfob argTypes returnType ->
             if length args == length argTypes
-            then 
+            then
                 let argChecks = zipWith (\arg expectedType -> check True env arg == expectedType) args argTypes
                 in if all id argChecks
                     then returnType
@@ -353,13 +353,13 @@ type VarIndex = Int
 data Dexp = Dnum Int             -- Constante entière.
           | Dbool Bool           -- Constante Booléenne.
           | Dvar VarIndex        -- Référence à une variable.
-          | Dtest Lexp Lexp Lexp -- Expression conditionelle.
-          | Dfob Int Lexp        -- Construction de fobjet de N arguments.
-          | Dsend Lexp [Lexp]    -- Appel de fobjet.
-          | Dlet Lexp Lexp       -- Déclaration non-récursive.
+          | Dtest Dexp Dexp Dexp -- Expression conditionelle.
+          | Dfob Int Dexp        -- Construction de fobjet de N arguments.
+          | Dsend Dexp [Dexp]    -- Appel de fobjet.
+          | Dlet Dexp Dexp       -- Déclaration non-récursive.
           -- Déclaration d'une liste de variables qui peuvent être
           -- mutuellement récursives.
-          | Dfix [Lexp] Lexp
+          | Dfix [Dexp] Dexp
           deriving (Show, Eq)
 
 -- Renvoie le "De Buijn index" de la variable, i.e. sa position
@@ -374,17 +374,30 @@ l2d :: TEnv -> Lexp -> Dexp
 l2d _ (Lnum n) = Dnum n
 l2d _ (Lbool b) = Dbool b
 l2d tenv (Lvar v) = Dvar (lookupDI tenv v 0)
-l2d _ (Ltest e1 e2 e3) = Dtest e1 e2 e3
+l2d tenv (Ltest e1 e2 e3) =
+    Dtest (l2d tenv e1) (l2d tenv e2) (l2d tenv e3)
 -- Remove la variable du `let` et on met dans env
 -- pour l'eval de De Buijn futur
 l2d tenv (Llet v e1 e2) =
-    let _ = (v, Tnum) : tenv 
-    in Dlet e1 e2
-l2d _ (Lfob args body) =
+    let de = l2d tenv e1
+        newEnv = (v, Tnum) : tenv
+        de' = l2d newEnv e2
+    in Dlet de de'
+-- La fonction check va regarder si les types sont bons
+-- donc on peut les ignorer ici
+l2d tenv (Lfob args body) =
     let nArgs = length args
-    in Dfob nArgs body
-l2d _ (Lsend f args) = Dsend f args -- ne change pas
-l2d _ (Lfix decls body) = Dfix (map snd decls) body
+        newEnv = [(v, t) | (v, t) <- args] ++ tenv
+    in Dfob nArgs (l2d newEnv body)
+l2d tenv (Lsend func args) =
+    let func' = l2d tenv func
+        args' = map (l2d tenv) args
+    in Dsend func' args'
+l2d tenv (Lfix decls body) = 
+    let newEnv = [(v, Tnum) | (v, _) <- decls] ++ tenv
+        decls' = map (\(_, e) -> l2d newEnv e) decls
+    in Dfix decls' (l2d newEnv body)
+
 
 ---------------------------------------------------------------------------
 -- Évaluateur                                                            --
@@ -450,7 +463,7 @@ valOf = evalSexp . sexpOf
 test1 :: Lexp
 test1 = s2l (sexpOf "(fix (((f (x Num)) 42)) body)")
 
-test2 :: Lexp 
+test2 :: Lexp
 test2 = s2l (sexpOf "(fix (((f (x Num)) Bool (if x true false))) body)")
 
 test3 :: Lexp
