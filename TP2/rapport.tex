@@ -1,0 +1,114 @@
+\documentclass[a4paper,12pt]{article}
+
+% Packages nécessaires
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{enumitem}
+\usepackage{titlesec}
+
+% Configuration des marges
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+
+% Titres des sections
+\titleformat{\section}{\large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{1em}{}
+
+% En-têtes et pieds de page
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{IFT-2035 : TP2}
+\fancyhead[R]{\thepage}
+\fancyfoot[C]{\small Université de Montréal \textbullet{} \today}
+
+% Définition du titre et des auteurs
+\title{IFT-2035 : TP2}
+\author{
+    Mathias La Rochelle (20269985) \\ 
+    Michel Lamothe (XXXXXXXX)
+}
+\date{\today}
+
+\begin{document}
+
+% Page de titre
+\maketitle
+
+\vspace{2em}
+% Table des matières
+\tableofcontents
+\newpage
+
+% Contenu principal
+\section{Problèmes rencontrés}
+    \subsection{\texttt{s2l}}
+        La fonction \texttt{s2l} n'a pas été un très gros problème. La grande majorité du code
+        provient du solutionnaire donné sur StudiUM. Les cas qui ont dû être adaptés afin de 
+        prendre en compte l'ajout des types sont les expressions de déclarations de variables
+        avec `fix' et les déclarations de fonctions avec `fob'. Pour `fix', ce qui a été le 
+        plus énervant était la gestion des deux types d'écriture : celle avec la précision
+        des types des arguments et celle qui ajoutait la précision du type de la valeur de 
+        retour. Cependant, la fonction auxiliaire que nous avons écris, i.e. \texttt{argsToTuple}, 
+        a pu être utilisée non seulement pour ces deux cas de `fix', mais également le 
+        pattern-match avec `fob'. Sa réutilisation a permis d'alléger l'ensemble du code qui
+        était, au début, était lourd et peu lisible.
+    \subsection{\texttt{check}}
+    \subsection{\texttt{l2d}}
+        La fonction \texttt{l2d} a été compliqué à implémenter. La suppression des annotations
+        de types n'était pas facile car il a fallu plusieurs fois créer des nouveaux environnements
+        pour garder en compte les variables/arguments ainsi que leur type. Particulièrement, lors
+        de l'écriture des cas pour `Lsend' et `Lfix', nous nous sommes retrouvés régulièrement à
+        écrire sur une feuille de papier ce qui se passait réellement dans de telles expressions
+        lors du renommage. Il fallait anticiper ce qui allait dérouler lors de l'évaluation future
+        des \texttt{Dexp}.
+    \subsection{\texttt{eval}}
+
+\newpage
+\section{Structures des tests}
+    \subsection{Typés correctement}
+    \subsection{Refusés par le vérificateur}
+        \subsubsection{Échoue sur \texttt{eval}}
+        \subsubsection{N'échoue pas}
+
+\newpage
+\section{Extensions possibles}
+    \subsection{Types supplémentaires}
+        Afin d'enrichir le language \texttt{sslip} et d'en augmenter ses capacités, l'ajout de 
+        nouveaux constructeurs au type \texttt{Type} serait une extension qui pourrait être 
+        considérée.
+        \subsubsection{\texttt{Tstring}}
+            Les chaînes de caractères ne sont pas souvent priorisées dans la création de nouveaux
+            languages de programmation mais cela est dû au fait qu'elles sont complexes à gérer.
+            Cependant, leur implémentation pourrait être fait de manière plus simple si un type
+            pour la gestion de listes serait implémenté. Alors, on aurait uniquement besoin 
+            d'ajouter un type \texttt{Tchar} étant donné qu'une chaîne de caractères se retrouve
+            à être simplement une liste de \texttt{Char}. De plus, cet ajencement serait plus
+            flexible au niveau des opérations de chaînes telles que des concaténations ou des 
+            comparaisons seraient plus facile à implémenter. Il y aurait quelques changements 
+            à faire dans les "parser" de l'interpréteur, mais après le reste sera dirigé par 
+            des règles dans les fonctions que nous avons définies.
+        \subsubsection{\texttt{Tlist}}
+            Un tel constructeur permettrait d'effectuer des manipulations sur des listes
+            de différents types de valeurs. Les listes sont très importantes dans les 
+            languages de programmation et ici, cela rajoutterai un niveau de complexité 
+            sans trop avoir à modifier le code. Comme précisé plus tôt, celles-ci permettraient
+            également d'implanter les chaînes de caractères. On pourrait aussi laisser
+            place à notre imagination et construire "from scratch" des structures de données
+            telles que des piles ou des files d'attentes.
+    \subsection{Boucles}
+        Les boucles telles que \texttt{while} serait utile pour itérer à travers notre toute 
+        nouvelle implémentation du type \texttt{Tlist}. Son ajout au language se ferait comme 
+        toute autre expression : gestion du cas de rencontre `while' dans \texttt{s2l}, nouvelle
+        règle dans le "parser", un nouveau constructure dans le type \texttt{Lexp} et \texttt{Dexp}
+        et j'en passe.
+
+
+\newpage
+\section{Conclusion}
+
+\end{document}

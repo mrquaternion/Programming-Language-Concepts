@@ -386,8 +386,6 @@ l2d tenv (Llet v e1 e2) =
         newEnv = (v, t) : tenv
         de' = l2d newEnv e2
     in Dlet de de'
--- La fonction check va regarder si les types sont bons
--- donc on peut les ignorer ici
 l2d tenv (Lfob args body) =
     let nArgs = length args
         newEnv = [(v, t) | (v, t) <- args] ++ tenv
@@ -444,8 +442,7 @@ eval env (Dlet e1 e2) =
         newEnv = val : env
     in eval newEnv e2
 eval env (Dfix decls body) =
-    let
-        placeholders = replicate (length decls) (error "Référence circulaire")
+    let placeholders = replicate (length decls) (error "Référence circulaire")
         newEnv = placeholders ++ env
         decls' = map (eval newEnv) decls
         fixedEnv = zipWith const decls' newEnv
