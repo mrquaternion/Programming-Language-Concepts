@@ -1,0 +1,3 @@
+(fix (((add1 (x Num)) Num (+ x 1))) (add1 41))          ; ↝ 42
+(let x 42 (if (> x 0) true false))                      ; ↝ True
+                                
