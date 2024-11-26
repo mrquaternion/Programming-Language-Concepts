@@ -30,7 +30,7 @@
 \title{IFT-2035 : TP2}
 \author{
     Mathias La Rochelle (20269985) \\ 
-    Michel Lamothe (XXXXXXXX)
+    Michel Lamothe (20243894)
 }
 \date{\today}
 
@@ -58,6 +58,14 @@
         pattern-match avec `fob'. Sa réutilisation a permis d'alléger l'ensemble du code qui
         était, au début, était lourd et peu lisible.
     \subsection{\texttt{check}}
+    
+    \subsubsection{Gestion des environnements}
+    La distinction entre \texttt{TEnv} (type \texttt{[(Var, Type)]}) et \texttt{Env} (type \texttt{[(Var, Type, Value)]}) a causé des incompatibilités lors des tests, car les deux structures étaient utilisées à des moments différents (statique pour \texttt{TEnv}, dynamique pour \texttt{Env}). Nous avons introduit une fonction de conversion, \texttt{toTEnv}, pour extraire l’environnement statique à partir de l’environnement dynamique, ce qui a permis de synchroniser leur utilisation dans \texttt{check}. Il est probablement préférable de garder \texttt{TEnv} et \texttt{Env} séparés. Cela garantit une distinction claire entre la vérification statique des types et l'évaluation dynamique des valeurs.
+    
+    \subsubsection{Expressions incorrectes}
+    Certains cas d’expressions incorrectes, comme des variables non définies ou des appels de fonctions avec un nombre incorrect d’arguments, n’étaient pas initialement détectés. Nous avons donc ajouté des validations supplémentaires dans \texttt{Lsend}, \texttt{Llet} et \texttt{Lfix} pour capturer ces erreurs.
+
+
     \subsection{\texttt{l2d}}
         La fonction \texttt{l2d} a été compliqué à implémenter. La suppression des annotations
         de types n'était pas facile car il a fallu plusieurs fois créer des nouveaux environnements
