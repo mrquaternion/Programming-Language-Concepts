@@ -1,7 +1,8 @@
 (let x 42 (if (> x 0) true false))                      ; ↝ True
 (fix (((add1 (x Num)) Num (+ x 1))) (add1 41))          ; ↝ 42
-(let x 5 (let y 10 (+ x y)))                           ; ↝ 15
-(if (< 5 10) true false)                               ; ↝ True
+(let x 5 (let y 10 (+ x y)))                            ; ↝ 15
+(if (< 5 10) true false)                                ; ↝ True
 (fix (((fact (n Num)) Num (if (= n 0) 1 (* n (fact (- n 1)))))) (fact 5))    ; ↝ 120 : Tnum
-    -- POUR LE TEST 5 : Left (Tnum ,*** Exception: Référence circulaire CallStack (from HasCallStack): error, called at sslip.hs:494:50 in main:Main
-    -- Il y a une erreur on niveau de la valeur.
+
+;; POUR LE TEST 5 : Left (Tnum ,*** Exception: Référence circulaire CallStack (from HasCallStack): error, called at sslip.hs:494:50 in main:Main
+;; Il y a une erreur on niveau de la valeur.

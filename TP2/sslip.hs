@@ -17,8 +17,6 @@
 import Text.ParserCombinators.Parsec -- Bibliothèque d'analyse syntaxique.
 import Data.Char                -- Conversion de Chars de/vers Int et autres.
 import System.IO                -- Pour stdout, hPutStr
-import Distribution.Simple.Test (test)
-import Debug.Trace
 
 ---------------------------------------------------------------------------
 -- La représentation interne des expressions de notre language           --
@@ -236,16 +234,17 @@ s2l (Snode (Ssym "let") [x, e1, e2])
   = Llet (svar2lvar x) (s2l e1) (s2l e2)
 s2l (Snode (Ssym "fix") [decls, body])
   = let sdecl2ldecl :: Sexp -> (Var, Lexp)
-        -- Cas 1 : Déclaration simple (x e)
+        -- Cas 1 : déclaration simple (x e)
         sdecl2ldecl (Snode (Ssym v) [e]) = (v, s2l e)
-        -- Cas 2 : Déclaration de fonction ((x args) e)
+        -- Cas 2 : déclaration de fonction ((x args) e)
         sdecl2ldecl (Snode (Snode (Ssym v) args) [e])
           = (v, Lfob (map argToTuple args) (s2l e))
-        -- Cas 3 : Déclaration complète ((x args) t e)
+        -- Cas 3 : déclaration complète ((x args) t e)
         sdecl2ldecl (Snode (Snode (Ssym v) args) [t, body2])
           = (v, Lfob (map argToTuple args) (Ltype (s2l body2) (s2type t)))
         -- Gestion des erreurs
-        sdecl2ldecl se = error ("Déclaration inconnue dans fix : " ++ showSexp se)
+        sdecl2ldecl se = error ("Déclaration inconnue dans fix : " 
+                                ++ showSexp se)
     in Lfix (map sdecl2ldecl (s2list decls)) (s2l body)
 s2l (Snode f args)
   = Lsend (s2l f) (map s2l args)
@@ -311,27 +310,31 @@ check _ env (Lvar x) =
         Nothing -> Terror ("Variable inconnue: " ++ x)
 
 -- Annotation de type
-check True env (Ltype e τ) =
+check True env (Ltype e tp) =
     let t = check True env e
-    in if t == τ then τ else Terror ("Type mismatch: attendu " ++ show τ ++ ", obtenu " ++ show t)
-check False _ (Ltype _ τ) = τ
+    in if t == tp then tp else Terror ("Mauvais type: attendu "
+                                    ++ show tp
+                                    ++ ", obtenu "
+                                    ++ show t)
+check False _ (Ltype _ tp) = tp
 
 -- Déclaration locale let x e1 e2
 check True env (Llet x e1 e2) =
     let t1 = check True env e1
-    in trace ("Llet: " ++ x ++ " has type " ++ show t1 ++ " in env " ++ show env) $
-       if t1 == Terror "Expression inconnue"
+    in if t1 == Terror "Expression inconnue"
        then Terror ("Erreur dans Llet : " ++ x ++ " a un type invalide")
        else check True ((x, t1) : env) e2
 
 check True env (Ltest e1 e2 e3) =
     case check True env e1 of
-        Tbool -> 
+        Tbool ->
             let t2 = check True env e2
                 t3 = check True env e3
-            in trace ("Ltest branches: " ++ show t2 ++ ", " ++ show t3) $
-               if t2 == t3 then t2 else Terror "Branches de if de types différents"
-        t -> Terror ("Condition de if n'est pas un booléen, obtenu : " ++ show t)
+            in if t2 == t3 
+                then t2 
+                else Terror "Branches de if de types différents"
+        t -> Terror ("Condition de if n'est pas un booléen, obtenu : " 
+                    ++ show t)
 
 
 -- Appel de fonction
@@ -339,13 +342,23 @@ check True env (Lsend f args) =
     case check True env f of
         Tfob argTypes returnType ->
             if length args == length argTypes
-            then 
-                let argChecks = zipWith (\arg expectedType -> check True env arg == expectedType) args argTypes
-                in if all id argChecks
+            then
+                let argChecks = zipWith checkType args argTypes
+                in if and argChecks
                     then returnType
-                    else Terror ("Types des arguments incorrects dans Lsend: " ++ show args ++ " attendu: " ++ show argTypes)
-            else Terror ("Nombre d'arguments incorrect pour Lsend : attendu " ++ show (length argTypes) ++ ", obtenu " ++ show (length args))
-        t -> Terror ("Expression appelee n'est pas une fonction, type obtenu : " ++ show t)
+                    else Terror ("Types des arguments incorrects dans Lsend: " 
+                                ++ show args 
+                                ++ " attendu : " 
+                                ++ show argTypes)
+            else Terror ("Nombre d'arguments incorrect pour Lsend : attendu " 
+                                ++ show (length argTypes) 
+                                ++ ", obtenu : " 
+                                ++ show (length args))
+        t -> Terror ("Expression appelee n'est pas une fonction, type obtenu: " 
+                    ++ show t)
+    where 
+        checkType :: Lexp -> Type -> Bool
+        checkType arg expectedType = check True env arg == expectedType
 
 -- Déclaration de fonction
 check True env (Lfob args body) =
@@ -356,12 +369,13 @@ check True env (Lfob args body) =
         t -> Tfob (map snd args) t
 
 -- Déclaration locale récursive
-check True env (Lfix decls body) =
-    let 
-        -- Étape 1 : Environnement temporaire
-        initEnv = [(x, Tfob (map (const Tnum) args) Tnum) | (x, Lfob args _) <- decls]
+check True env (Lfix decs body) =
+    let
+        -- Étape 1 : environnement temporaire
+        initEnv = 
+            [(x, Tfob (map (const Tnum) args) Tnum) | (x, Lfob args _) <- decs]
 
-        -- Étape 2 : Raffinement des types
+        -- Étape 2 : raffinement des types
         refineEnv :: TEnv -> [(Var, Lexp)] -> TEnv
         refineEnv currentEnv [] = currentEnv
         refineEnv currentEnv ((x, Lfob args body'):rest) =
@@ -370,13 +384,13 @@ check True env (Lfix decls body) =
                 t = check True fullEnv body'
             in refineEnv ((x, Tfob (map snd args) t) : currentEnv) rest
 
-        fullEnv' = refineEnv initEnv decls
+        fullEnv' = refineEnv initEnv decs
 
-        -- Étape 4 : Vérification des déclarations
-        verifyDecls = all (\(_, Lfob args body') -> 
+        -- Étape 4 : vérification des déclarations
+        verifyDecls = all (\(_, Lfob args body') ->
             let argEnv = [(argName, argType) | (argName, argType) <- args]
                 t = check True (argEnv ++ fullEnv' ++ env) body'
-            in t /= Terror "Expression inconnue") decls
+            in t /= Terror "Expression inconnue") decs
     in if verifyDecls
        then check True (fullEnv' ++ env) body
        else Terror "Erreur dans les déclarations récursives"
@@ -443,7 +457,7 @@ l2d tenv (Lsend func args) =
     let func' = l2d tenv func
         args' = map (l2d tenv) args
     in Dsend func' args'
-l2d tenv (Lfix decls body) = 
+l2d tenv (Lfix decls body) =
     let -- Créer le nouvel environnement avec les types (pour les variables récursives)
         newEnv = [(v, t) | (v, e) <- decls, let t = check True tenv e] ++ tenv
         -- Convertir les expressions des déclarations
@@ -456,7 +470,7 @@ l2d tenv (Lfix decls body) =
 ---------------------------------------------------------------------------
 
 getVal :: [Value] -> Int -> Int -> Value
-getVal (v:vs) i c 
+getVal (v:vs) i c
                 | i == c = v
                 | otherwise = getVal vs i (c + 1)
 getVal [] _ _ = error "La variable n'est pas dans la liste"
@@ -466,14 +480,14 @@ type VEnv = [Value]
 eval :: VEnv -> Dexp -> Value
 eval _ (Dnum n) = Vnum n
 eval _ (Dbool b) = Vbool b
-eval env (Dvar vIndex) = getVal env vIndex 0   
+eval env (Dvar vIndex) = getVal env vIndex 0
 eval env (Dtest cond thenE elseE) =
     case eval env cond of
         Vbool True -> eval env thenE
         Vbool False -> eval env elseE
         v -> error ("La condition n'est pas un booléen : " ++ show v)
 eval env (Dfob nArgs body) = Vfob env nArgs body
-eval env (Dsend f actuals) = 
+eval env (Dsend f actuals) =
     let fv = eval env f
         actualsv = map (eval env) actuals
     in case fv of
@@ -481,9 +495,9 @@ eval env (Dsend f actuals) =
         Vfob env' nArgs body ->
             if nArgs == length actualsv
             then eval (actualsv ++ env') body
-            else error ("Nombre invalide d'arguments : reçu " 
-                                            ++ show (length actualsv) 
-                                            ++ " au lieu de " 
+            else error ("Nombre invalide d'arguments : reçu "
+                                            ++ show (length actualsv)
+                                            ++ " au lieu de "
                                             ++ show nArgs)
         v -> error ("Pas une fonction : " ++ show v)
 eval env (Dlet e1 e2) =
@@ -491,11 +505,10 @@ eval env (Dlet e1 e2) =
         newEnv = val : env
     in eval newEnv e2
 eval env (Dfix decls body) =
-    let placeholders = replicate (length decls) (error "Référence circulaire")
-        newEnv = placeholders ++ env
-        decls' = map (eval newEnv) decls
-        fixedEnv = zipWith const decls' newEnv
-    in eval fixedEnv body
+    -- Création d'un environnement récursif où chaque 
+    -- déclaration a accès à toutes les autres
+    let newEnv = map (eval (newEnv ++ env)) decls ++ env
+    in eval newEnv body
 
 
 ---------------------------------------------------------------------------
