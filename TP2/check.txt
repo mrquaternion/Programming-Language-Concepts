@@ -17,6 +17,10 @@
 
 type TEnv = [(Var, Type)]
 
+toTEnv :: Env -> TEnv
+toTEnv env = map (\(var, typ, _) -> (var, typ)) env
+
+
 check :: Bool -> TEnv -> Lexp -> Type
 check _ _ (Lnum _) = Tnum
 check _ _ (Lbool _) = Tbool
@@ -27,10 +31,13 @@ check _ env (Lvar x) =
         Nothing -> Terror ("Variable inconnue: " ++ x)
 
 -- Annotation de type
-check True env (Ltype e τ) =
+check True env (Ltype e tp) =
     let t = check True env e
-    in if t == τ then τ else Terror ("Type mismatch: attendu " ++ show τ ++ ", obtenu " ++ show t)
-check False _ (Ltype _ τ) = τ
+    in if t == tp then tp else Terror ("Mauvais type: attendu "
+                                    ++ show tp
+                                    ++ ", obtenu "
+                                    ++ show t)
+check False _ (Ltype _ tp) = tp
 
 -- Déclaration locale let x e1 e2
 check True env (Llet x e1 e2) =
@@ -39,27 +46,40 @@ check True env (Llet x e1 e2) =
        then Terror ("Erreur dans Llet : " ++ x ++ " a un type invalide")
        else check True ((x, t1) : env) e2
 
--- Conditionnelle if e1 e2 e3
 check True env (Ltest e1 e2 e3) =
     case check True env e1 of
-        Tbool -> 
+        Tbool ->
             let t2 = check True env e2
                 t3 = check True env e3
-            in if t2 == t3 then t2 else Terror "Branches de if de types différents"
-        t -> Terror ("Condition de if n'est pas un booléen, obtenu : " ++ show t)
+            in if t2 == t3 
+                then t2 
+                else Terror "Branches de if de types différents"
+        t -> Terror ("Condition de if n'est pas un booléen, obtenu : " 
+                    ++ show t)
+
 
 -- Appel de fonction
 check True env (Lsend f args) =
     case check True env f of
         Tfob argTypes returnType ->
             if length args == length argTypes
-            then 
-                let argChecks = zipWith (\arg expectedType -> check True env arg == expectedType) args argTypes
-                in if all id argChecks
+            then
+                let argChecks = zipWith checkType args argTypes
+                in if and argChecks
                     then returnType
-                    else Terror ("Types des arguments incorrects dans Lsend: " ++ show args ++ " attendu: " ++ show argTypes)
-            else Terror ("Nombre d'arguments incorrect pour Lsend : attendu " ++ show (length argTypes) ++ ", obtenu " ++ show (length args))
-        t -> Terror ("Expression appelee n'est pas une fonction, type obtenu : " ++ show t)
+                    else Terror ("Types des arguments incorrects dans Lsend: " 
+                                ++ show args 
+                                ++ " attendu : " 
+                                ++ show argTypes)
+            else Terror ("Nombre d'arguments incorrect pour Lsend : attendu " 
+                                ++ show (length argTypes) 
+                                ++ ", obtenu : " 
+                                ++ show (length args))
+        t -> Terror ("Expression appelee n'est pas une fonction, type obtenu: " 
+                    ++ show t)
+    where 
+        checkType :: Lexp -> Type -> Bool
+        checkType arg expectedType = check True env arg == expectedType
 
 -- Déclaration de fonction
 check True env (Lfob args body) =
@@ -71,29 +91,32 @@ check True env (Lfob args body) =
 
 -- Déclaration locale récursive
 check True env (Lfix decls body) =
-    let 
-        -- Étape 1 : Environnement temporaire
-        initEnv = [(x, Tfob (map (const Tnum) args) Tnum) | (x, Lfob args _) <- decls]
+    let
+        -- Étape 1 : Environnement temporaire avec des types par défaut
+        initEnv = [(x, Tfob (map snd args) Tnum) | (x, Lfob args _) <- decls]
 
-        -- Étape 2 : Raffinement des types
+        -- Étape 2 : Raffinement des types dans l'environnement progressif
         refineEnv :: TEnv -> [(Var, Lexp)] -> TEnv
         refineEnv currentEnv [] = currentEnv
-        refineEnv currentEnv ((x, Lfob args body'):rest) =
+        refineEnv currentEnv ((x, Lfob args body):rest) =
             let argEnv = [(argName, argType) | (argName, argType) <- args]
                 fullEnv = argEnv ++ currentEnv ++ env
-                t = check True fullEnv body'
+                t = check True fullEnv body
             in refineEnv ((x, Tfob (map snd args) t) : currentEnv) rest
+        refineEnv _ _ = error "Erreur de structure dans Lfix"
 
-        fullEnv' = refineEnv initEnv decls
+        refinedEnv = refineEnv initEnv decls
 
-        -- Étape 4 : Vérification des déclarations
-        verifyDecls = all (\(_, Lfob args body') -> 
+        -- Étape 3 : Vérification de chaque déclaration avec l'environnement raffiné
+        validateDecls = all (\(x, Lfob args body) ->
             let argEnv = [(argName, argType) | (argName, argType) <- args]
-                t = check True (argEnv ++ fullEnv' ++ env) body'
+                t = check True (argEnv ++ refinedEnv ++ env) body
             in t /= Terror "Expression inconnue") decls
-    in if verifyDecls
-       then check True (fullEnv' ++ env) body
+    in if validateDecls
+       then check True (refinedEnv ++ env) body
        else Terror "Erreur dans les déclarations récursives"
+
 
 -- Cas par défaut
 check _ _ _ = Terror "Expression inconnue"
+
