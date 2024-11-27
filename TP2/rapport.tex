@@ -78,6 +78,16 @@
 \newpage
 \section{Structures des tests}
     \subsection{Typés correctement}
+        Du premier coup, la grande majorité des tests typés correctement
+        ont passé l'évaluateur. Le seul type de test qui nous a posé
+        problème est le cas de récursivité avec `fix'. À l'origine,
+        nous utilisons le concept de "placeholders" pour les déclarations
+        récursives mais justement, les valeurs temporaires n'étaient pas
+        remplacées correctement. Pour remédier à ce problème, nous nous
+        sommes dirigés vers une récursion directe dans le nouvel environnement.
+        Cela a également permis de rendre notre code plus concis et donc
+        mieux lisible. De plus, on exploite complètement le "lazy evaluation"
+        de Haskell. Quoi de mieux :)
     \subsection{Refusés par le vérificateur}
         \subsubsection{Échoue sur \texttt{eval}}
         \subsubsection{N'échoue pas}
