@@ -383,31 +383,27 @@ check True env (Lfob args body) =
 -- Déclaration locale récursive
 check True env (Lfix decls body) =
     let
-        -- Étape 1 : Environnement temporaire avec des types par défaut
-        initEnv = 
-            [(x, Tfob (map snd args) Tnum) | (x, Lfob args _) <- decls]
+        -- Étape 1 : Ajouter des types par défaut
+        initEnv = [(x, Tfob (map snd args) (Terror "Type inconnu")) | (x, Lfob args _) <- decls]
+        fullEnv = initEnv ++ env
 
-        -- Étape 2 : Raffinement des types dans l'environnement progressif
-        refineEnv :: TEnv -> [(Var, Lexp)] -> TEnv
-        refineEnv currentEnv [] = currentEnv
-        refineEnv currentEnv ((x, Lfob args body'):rest) =
+        -- Étape 2 : Raffinement des types
+        refineDecls :: TEnv -> [(Var, Lexp)] -> Either String TEnv
+        refineDecls currentEnv [] = Right currentEnv
+        refineDecls currentEnv ((x, Lfob args body'):rest) =
             let argEnv = [(argName, argType) | (argName, argType) <- args]
-                fullEnv = argEnv ++ currentEnv ++ env
-                t = check True fullEnv body'
-            in refineEnv ((x, Tfob (map snd args) t) : currentEnv) rest
-        refineEnv _ _ = error "Erreur de structure dans Lfix"
+                t = check True (argEnv ++ currentEnv ++ env) body'
+            in case t of
+                Terror err -> Left ("Erreur dans la déclaration de " ++ x ++ ": " ++ err)
+                _ -> case refineDecls ((x, Tfob (map snd args) t) : currentEnv) rest of
+                        Left err -> Left err
+                        Right refined -> Right refined
 
-        refinedEnv = refineEnv initEnv decls
+        refinedEnv = refineDecls fullEnv decls
+    in case refinedEnv of
+        Left err -> Terror err
+        Right finalEnv -> check True (finalEnv ++ env) body
 
-        -- Étape 3 : Vérification de chaque déclaration avec 
-        -- l'environnement raffiné
-        validateDecls = all (\(_, Lfob args body') ->
-            let argEnv = [(argName, argType) | (argName, argType) <- args]
-                t = check True (argEnv ++ refinedEnv ++ env) body'
-            in t /= Terror "Expression inconnue") decls
-    in if validateDecls
-       then check True (refinedEnv ++ env) body
-       else Terror "Erreur dans les déclarations récursives"
 
 -- Cas par défaut
 check _ _ _ = Terror "Expression inconnue"
