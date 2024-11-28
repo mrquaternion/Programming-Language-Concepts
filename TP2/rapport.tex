@@ -58,13 +58,10 @@
         pattern-match avec `fob'. Sa réutilisation a permis d'alléger l'ensemble du code qui
         était, au début, était lourd et peu lisible.
     \subsection{\texttt{check}}
-    
     \subsubsection{Gestion des environnements}
     La distinction entre \texttt{TEnv} (type \texttt{[(Var, Type)]}) et \texttt{Env} (type \texttt{[(Var, Type, Value)]}) a causé des incompatibilités lors des tests, car les deux structures étaient utilisées à des moments différents (statique pour \texttt{TEnv}, dynamique pour \texttt{Env}). Nous avons introduit une fonction de conversion, \texttt{toTEnv}, pour extraire l’environnement statique à partir de l’environnement dynamique, ce qui a permis de synchroniser leur utilisation dans \texttt{check}. Il est probablement préférable de garder \texttt{TEnv} et \texttt{Env} séparés. Cela garantit une distinction claire entre la vérification statique des types et l'évaluation dynamique des valeurs.
-    
     \subsubsection{Expressions incorrectes}
     Certains cas d’expressions incorrectes, comme des variables non définies ou des appels de fonctions avec un nombre incorrect d’arguments, n’étaient pas initialement détectés. Nous avons donc ajouté des validations supplémentaires dans \texttt{Lsend}, \texttt{Llet} et \texttt{Lfix} pour capturer ces erreurs.
-
     \subsection{\texttt{l2d}}
         La fonction \texttt{l2d} a été compliqué à implémenter. La suppression des annotations
         de types n'était pas facile car il a fallu plusieurs fois créer des nouveaux environnements
@@ -74,6 +71,10 @@
         lors du renommage. Il fallait anticiper ce qui allait dérouler lors de l'évaluation future
         des \texttt{Dexp}.
     \subsection{\texttt{eval}}
+        Un peu comme la fonction \texttt{s2l}, la fonction \texttt{eval} n'a pas été un soucis
+        a implémenté puisque beaucoup de cas pouvaient être dérivés de celle du TP1. Il fallait 
+        juste l'adapté aux constructeurs de \texttt{Dexp} qui ne prennent plus en compte le
+        nom des variables déclarées mais plutôt l'entier de l'indice De Buijn.
 
 \newpage
 \section{Structures des tests}
@@ -88,7 +89,7 @@
         Cela a également permis de rendre notre code plus concis et donc
         mieux lisible. De plus, on exploite complètement le "lazy evaluation"
         de Haskell. Quoi de mieux :)
-    \subsection{Refusés par le vérificateur}
+    \subsection{Refusés par le vérificateur de \texttt{check}}
         \subsubsection{Échoue sur \texttt{eval}}
         \subsubsection{N'échoue pas}
 
@@ -124,10 +125,33 @@
         règle dans le "parser", un nouveau constructure dans le type \texttt{Lexp} et \texttt{Dexp}
         et j'en passe.
 
+\section{Ce que nous n'avons pas fait}
+    Nous avons vu beaucoup d'étudiants demander si l'importation d'un
+    X module était alloué sur le forum de StudiUM. Nous avons décidé
+    de ne pas procéder ainsi, autrement notre solution aurait divergée
+    du corrigé et cela aurait 1. alourdi le code 2. compliqué le 
+    débogage 3. ralenti la correction pour les auxiliaires.
 
 \newpage
 \section{Conclusion}
     \subsection{Surprises}
+        Nous n'avions eu aucune surprise jusqu'au mercredi 27 novembre. On relit le 
+        rapport et nous nous aperçevons que nous n'avons pas fait la gestion du sucre
+        syntaxique avec le `:'. Cela posait beaucoup de problème car dans le cas que
+        l'un des tests cachés utilisait ce cas de $e$, notre code aurait échoué sur
+        \texttt{eval}. Pour remedier à ce problème de dernière minute, nous avons 
+        ajouté un cas de "pattern-matching" qui s'occupe d'un \texttt{Ssym ":"} en 
+        séparant l'expression centrale qui représente le corps et le type. Cela à
+        l'air simple comme modification mais cela nous a pris beaucoup de temps avant
+        de comprendre comment gérer cela puis aussi durant la construction des tests 
+        qui respectaient la syntaxe complète de \texttt{Sslip}. \\
+
+        De plus, jamais nous avons imaginer que la récursivité allait être notre
+        plus grand ennemi. Comme on dit en anglais, "it was a pain in the ass". Ce
+        n'est pas évident de comprendre comment une expression se décompose durant
+        l'évaluation et cela est principalement dû au fait que les techniques de 
+        débogage ne sont pas trivials en Haskell comparativement à des languages
+        de programmations impératifs comme Java et Python.
     \subsection{Ce que nous avons appris}
         À travers ce TP, nous avons appris à implémenter la logique derrière 
         la compréhension de types d'un interpréteur ainsi que la transformation
@@ -135,6 +159,9 @@
         Surprennament, il n'a pas été aussi compliqué que le premier. Nous croyons
         que cela est dû au fait que, à l'origine, nous ne savions pas comment nous
         y prendre. Il y avait beaucoup de choses à regarder et donc notre 
-        organisation était décousue.
+        organisation était décousue. Cependant, de manière globale, les gestions 
+        d'environnements sont désormais mieux compris dans l'ensemble. Haskell 
+        n'était pas un language intimidant, mais son utilisation dans la construction
+        d'un interpréteur d'un nouveau language n'était vraiment pas facile.
 
 \end{document}
