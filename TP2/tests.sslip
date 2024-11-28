@@ -1,9 +1,5 @@
-(let x 42 (if (> x 0) true false))                                                       ; ↝ True
-(fix (((add1 (x Num)) Num (+ x 1))) (add1 41))                                           ; ↝ 42
-(let x 5 (let y 10 (+ x y)))                                                             ; ↝ 15
-(if (< 5 10) true false)                                                                 ; ↝ True
-(fix (((fact (n Num)) Num (if (= n 0) 1 (* n (fact (- n 1)))))) (fact 5))                ; ↝ 120 : Tnum
-
-
-(fix (((add1 (x Bool)) Num (+ x 1))) (add1 41))                                          ; ↝ 42 mais ne passe pas `check`
-(fix (((add2 (x Num)) Num (add1 x)) ((add1 (y Bool)) Num (+ y 2))) (add2 1))            ; ↝ 3 suprennament n'echoue pas `check` mais devrait
+(let x (: 42 Num) (: (+ x 3) Num)) ; VALIDE (PAR EVALUATION ET TYPAGE)
+(fix ((myfunc (fob ((x Num) (y Num)) (if (= x y) true false)))) (myfunc 1 1)) ; VALIDE (PAR EVALUATION ET TYPAGE)
+(fix (((triple (a Num)) Num (+ (+ a a) a)) ((somme (x Num) (y Num)) Bool (: (if (= (+ x y) 3) true false) Bool))) (somme (triple 1) 1)) ; VALIDE (PAR EVALUATION ET TYPAGE)
+(fix ((e1 (fob ((x Num)) (: (e2 x) Bool))) (e2 (fob ((y Num)) (: (if (≥ y 4) true false) Bool)))) (e1 5)) ; NON-VALIDE (PAR EVALUATION)
+(fix ((myfunc (fob ((y Num)) (: (if (> y 2) 100 1) Num)))) (let x (: (* 2 (myfunc 3)) Num) (: (+ x 2) Num)))  VALIDE (PAR EVALUATION ET TYPAGE)

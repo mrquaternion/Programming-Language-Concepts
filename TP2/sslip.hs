@@ -212,6 +212,7 @@ s2type (Ssym "Num") = Tnum
 s2type (Ssym "Bool") = Tbool
 s2type (Snode (Ssym "fob") [argTypes, retType]) =
   Tfob (map s2type (s2list argTypes)) (s2type retType)
+s2type (Snode (Ssym ":") [_, t]) = s2type t
 s2type se = error ("Type inconnu : " ++ showSexp se)
 
 argToTuple :: Sexp -> (Var, Type)
@@ -226,26 +227,36 @@ s2l (Ssym "true") = Lbool True
 s2l (Ssym "false") = Lbool False
 s2l (Snum n) = Lnum n
 s2l (Ssym s) = Lvar s
+s2l (Snode (Ssym ":") [e, t]) 
+  = Ltype (s2l e) (s2type t)
 s2l (Snode (Ssym "if") [e1, e2, e3])
   = Ltest (s2l e1) (s2l e2) (s2l e3)
-s2l (Snode (Ssym "fob") [args, body])
+s2l (Snode (Ssym "fob") [args, body]) 
   = Lfob (map argToTuple (s2list args)) (s2l body)
 s2l (Snode (Ssym "let") [x, e1, e2])
   = Llet (svar2lvar x) (s2l e1) (s2l e2)
-s2l (Snode (Ssym "fix") [decls, body])
-  = let sdecl2ldecl :: Sexp -> (Var, Lexp)
-        -- Cas 1 : déclaration simple (x e)
-        sdecl2ldecl (Snode (Ssym v) [e]) = (v, s2l e)
-        -- Cas 2 : déclaration de fonction ((x args) e)
-        sdecl2ldecl (Snode (Snode (Ssym v) args) [e])
-          = (v, Lfob (map argToTuple args) (s2l e))
-        -- Cas 3 : déclaration complète ((x args) t e)
-        sdecl2ldecl (Snode (Snode (Ssym v) args) [t, body2])
-          = (v, Lfob (map argToTuple args) (Ltype (s2l body2) (s2type t)))
-        -- Gestion des erreurs
-        sdecl2ldecl se = error ("Déclaration inconnue dans fix : " 
-                                ++ showSexp se)
-    in Lfix (map sdecl2ldecl (s2list decls)) (s2l body)
+s2l (Snode (Ssym "fix") [decls, body]) =
+  let sdecl2ldecl :: Sexp -> (Var, Lexp)
+      -- Cas 1 : Déclaration simple (x e)
+      sdecl2ldecl (Snode (Ssym v) [e]) =
+        (v, s2l e)
+
+      -- Cas 2 : Déclaration typée (x τ e)
+      sdecl2ldecl (Snode (Ssym v) [t, e]) =
+        (v, Ltype (s2l e) (s2type t))
+
+      -- Cas 3 : Déclaration de fonction ((x (x1 τ1) ... (xn τn)) e)
+      sdecl2ldecl (Snode (Snode (Ssym v) args) [e]) =
+        (v, Lfob (map argToTuple args) (s2l e))
+
+      -- Cas 4 : Déclaration complète ((x (x1 τ1) ... (xn τn)) τ e)
+      sdecl2ldecl (Snode (Snode (Ssym v) args) [t, e]) =
+        (v, Lfob (map argToTuple args) (Ltype (s2l e) (s2type t)))
+
+      -- Gestion des erreurs
+      sdecl2ldecl se =
+        error ("Déclaration inconnue dans fix : " ++ showSexp se)
+  in Lfix (map sdecl2ldecl (s2list decls)) (s2l body)
 s2l (Snode f args)
   = Lsend (s2l f) (map s2l args)
 s2l se = error ("Expression Psil inconnue: " ++ showSexp se)
@@ -310,13 +321,15 @@ check _ env (Lvar x) =
         Nothing -> Terror ("Variable inconnue: " ++ x)
 
 -- Annotation de type
-check True env (Ltype e tp) =
-    let t = check True env e
-    in if t == tp then tp else Terror ("Mauvais type : attendu "
-                                    ++ show tp
-                                    ++ ", obtenu "
-                                    ++ show t)
-check False _ (Ltype _ tp) = tp
+check True env (Ltype e t) =
+    let t' = check True env e
+    in if t' == t 
+       then t 
+       else if t' == Terror "Expression inconnue" 
+            then Terror ("Expression mal formée : " ++ show e)
+            else Terror ("Mauvais type : attendu " ++ show t 
+                         ++ ", obtenu " ++ show t')
+check False _ (Ltype _ t) = t
 
 -- Déclaration locale let x e1 e2
 check True env (Llet x e1 e2) =
@@ -336,30 +349,28 @@ check True env (Ltest e1 e2 e3) =
         t -> Terror ("Condition de if n'est pas un booléen, obtenu : " 
                     ++ show t)
 
-
 -- Appel de fonction
 check True env (Lsend f args) =
     case check True env f of
         Tfob argTypes returnType ->
-            if length args == length argTypes
-            then
-                let argResults = zipWith checkType args argTypes
-                in case sequence argResults of
-                    Right _ -> returnType
-                    Left errMsg -> Terror ("Types des arguments incorrects dans Lsend: " ++ errMsg)
-            else Terror ("Nombre d'arguments incorrect pour Lsend : attendu " 
-                                ++ show (length argTypes) 
-                                ++ ", obtenu : " 
-                                ++ show (length args))
+            if length args /= length argTypes
+            then Terror ("Nombre d'arguments incorrect pour Lsend : attendu "
+                         ++ show (length argTypes) 
+                         ++ ", obtenu : " 
+                         ++ show (length args))
+            else if validateArgs args argTypes
+                 then returnType
+                 else Terror ("Types des arguments incorrects pour Lsend : " 
+                              ++ show (zip args argTypes))
         t -> Terror ("Expression appelee n'est pas une fonction, type obtenu: " 
-                    ++ show t)
-    where 
-        checkType :: Lexp -> Type -> Either String Type
-        checkType arg expectedType = 
-            case check True env arg of
-                Terror msg -> Left msg
-                t | t == expectedType -> Right t
-                  | otherwise -> Left ("Type attendu: " ++ show expectedType ++ ", obtenu: " ++ show t)
+                     ++ show t)
+  where
+    validateArgs :: [Lexp] -> [Type] -> Bool
+    validateArgs [] [] = True
+    validateArgs (arg:args') (expected:expected') =
+        let actual = check True env arg
+        in actual == expected && validateArgs args' expected'
+    validateArgs _ _ = False
 
 -- Déclaration de fonction
 check True env (Lfob args body) =
