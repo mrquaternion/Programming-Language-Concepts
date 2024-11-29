@@ -1,13 +1,59 @@
-(let x (: 42 Num) (: (+ x 3) Num)) ; VALIDE (PAR EVALUATION ET TYPAGE)
-(fix ((myfunc (fob ((x Num) (y Num)) (if (= x y) true false)))) (myfunc 1 1)) ; VALIDE (PAR EVALUATION ET TYPAGE)
-(fix (((triple (a Num)) Num (+ (+ a a) a)) ((somme (x Num) (y Num)) Bool (: (if (= (+ x y) 3) true false) Bool))) (somme (triple 1) 1)) ; VALIDE (PAR EVALUATION ET TYPAGE)
-(fix ((myfunc (fob ((y Num)) (: (if (> y 2) 100 1) Num)))) (let x (: (* 2 (myfunc 3)) Num) (: (+ x 2) Num))) ; VALIDE (PAR EVALUATION ET TYPAGE)
-(fix ((e2 (fob ((y Num)) (: (if (≥ y 4) true false) Bool))) (e1 (fob ((x Num)) (: (e2 x) Bool)))) (e1 5)) ; VALIDE (PAR EVALUATION ET TYPAGE)
+; #### Tests typés correctement ####
+(let x (: 42 Num) 
+    (: (+ x 3) Num)) ; ↝ Tnum 45
+
+(fix (
+    (myfunc (fob ((x Num) (y Num)) 
+                (if (= x y) true false)))
+) 
+(myfunc 1 1)) ; ↝ Tbool True
+
+(fix (
+    ((triple (a Num)) Num 
+            (+ (+ a a) a))
+    ((somme (x Num) (y Num)) Bool 
+            (: (if (= (+ x y) 3) true false) Bool))
+) 
+(somme (triple 1) 1)) ; ↝ Tbool False
+
+(fix (
+    (myfunc (fob ((y Num)) 
+                  (: (if (> y 2) 100 1) Num)))
+) 
+(let x (: (* 2 (myfunc 3)) Num) 
+    (: (+ x 2) Num))) ; ↝ Tnum 202
+
+(fix (
+    (e2 (fob ((y Num)) 
+              (: (if (≥ y 4) true false) Bool)))
+    (e1 (fob ((x Num)) 
+              (: (e2 x) Bool)))
+) 
+(e1 5)) ; ↝ Tbool True
 
 
-(let x (: 42 Bool) (: (+ x 3) Num)) ; x est annoté comme Bool, résultat retourne un Num (45)
-(fix ((fonction (fob ((x Num)) (: (+ x 1) Bool)))) (fonction 3)) ; fonction retourne un Bool, résultat un Num (4)
-(fix ((fonction (fob ((x Num)) (: (if (= x 0) true false) Num)))) (fonction 5)) ; focntion retourne un Num, résultat donne False
-(let x (: 5 Num) (: (+ x y) Num)) 
-(fix ((fonction (fob ((x Num)) (: (+ x 1) Num)))) (fonction true))
+; #### Tests non-typés correctement ####
+(let x (: 42 Bool) 
+    (: (+ x 3) Num)) ; x est annoté comme Bool, résultat retourne un Num (45)
+
+(fix (
+    (fonction (fob ((x Num)) 
+                     (: (+ x 1) Bool)))
+) 
+(fonction 3)) ; fonction retourne un Bool, résultat un Num (4)
+
+(fix (
+    (fonction (fob ((x Num)) 
+                     (: (if (= x 0) true false) Num)))
+) 
+(fonction 5)) ; fonction retourne un Num, résultat donne False
+
+(let x (: 5 Num) 
+    (: (+ x y) Num)) ; Variable y n'est pas définie
+
+(fix (
+    (fonction (fob ((x Num)) 
+                     (: (+ x 1) Num)))
+) 
+(fonction true)) ; Argument true n'est pas un Num
 
