@@ -324,15 +324,13 @@ check _ _ (Lnum _) = Tnum
 check _ _ (Lbool _) = Tbool
 
 -- Variables : vérifie si la variable est définie dans l'environnement `env`.
--- Si oui, retourne son type. Sinon, renvoie une erreur indiquant que la
--- variable est non définie.
 check _ env (Lvar x) =
     case lookup x env of
         Just t -> t
         Nothing -> Terror ("Variable non definie : '" ++ x ++ "'")
 
 -- Annotation de type : vérifie si l'expression annotée a le type attendu.
--- Si les types correspondent, retourne le type. Sinon, renvoie une erreur.
+-- Si les types correspondent, retourne le type.
 check True env (Ltype e t) =
     let t' = check True env e
     in if t' == t 
@@ -340,8 +338,8 @@ check True env (Ltype e t) =
        else Terror ("Annotation invalide. Attendu : " ++ show t ++
                     ", obtenu : " ++ showError t' ++ ".")
 
--- Si l'annotation est utilisée en mode non strict (`check False`), suppose
--- que le type annoté est correct.
+-- Si l'annotation est utilisée en mode non strict (`check False`), 
+-- on suppose que le type annoté est correct.
 check False _ (Ltype _ t) = t
 
 -- Déclaration locale `let` : ajoute la variable définie à l'environnement
@@ -349,7 +347,8 @@ check False _ (Ltype _ t) = t
 check True env (Llet x e1 e2) =
     let t1 = check True env e1
     in if case t1 of Terror _ -> True; _ -> False
-       then Terror ("Type invalide pour '" ++ x ++ "' : " ++ showError t1 ++ ".")
+       then Terror ("Type invalide pour '" ++ x ++ "' : " 
+                   ++ showError t1 ++ ".")
        else check True ((x, t1) : env) e2
 
 -- Conditionnelle `if` : vérifie que la condition est un booléen et que
@@ -361,8 +360,8 @@ check True env (Ltest e1 e2 e3) =
                 t3 = check True env e3
             in if t2 == t3 
                 then t2 
-                else Terror ("Branches conditionnelles de types différents : " ++
-                             showError t2 ++ " et " ++ showError t3 ++ ".")
+                else Terror ("Branches conditionnelles de types différents : " 
+                            ++ showError t2 ++ " et " ++ showError t3 ++ ".")
         t -> Terror ("Condition non booléenne : " ++ showError t ++ ".")
 
 -- Appel de fonction : vérifie que la fonction est une `Tfob` et que les
@@ -380,10 +379,13 @@ check True env (Lsend f args) =
                                     let actual = check True env arg
                                     in if actual == expectedType
                                        then Right ()
-                                       else Left ("Argument invalide : '" ++
-                                                  show arg ++ "', attendu : " ++
-                                                  show expectedType ++ ", obtenu : " ++
-                                                  showError actual ++ ".")
+                                       else Left ("Argument invalide : " 
+                                                 ++ show arg 
+                                                 ++ ", attendu : " 
+                                                 ++ show expectedType 
+                                                 ++ ", obtenu : " 
+                                                 ++ showError actual 
+                                                 ++ ".")
                                   ) checkedArgs
                 in case sequence results of
                      Right _ -> returnType
@@ -392,7 +394,7 @@ check True env (Lsend f args) =
         _ -> Terror "Expression appelée non fonctionnelle."
 
 -- Déclaration de fonction `fob` : ajoute les arguments à l'environnement
--- et vérifie le corps de la fonction.
+-- et on vérifie le corps de la fonction.
 check True env (Lfob args body) =
     let argEnv = [(x, t) | (x, t) <- args]
         fullEnv = argEnv ++ env
@@ -401,7 +403,7 @@ check True env (Lfob args body) =
         t -> Tfob (map snd args) t
 
 -- Déclaration locale récursive `fix` : initialise l'environnement avec des
--- types par défaut, affine les types des déclarations et vérifie le corps.
+-- types par défaut, affine les types des déclarations et on vérifie le corps.
 check True env (Lfix decls body) =
     let
         -- Initialisation avec des types inconnus
@@ -410,32 +412,25 @@ check True env (Lfix decls body) =
         fullEnv = initEnv ++ env
 
         -- Raffinement des déclarations
-        refineDecls :: TEnv -> [(Var, Lexp)] -> Either String TEnv
-        refineDecls currentEnv [] = Right currentEnv
-        refineDecls currentEnv ((x, Lfob args body'):rest) =
+        refine :: TEnv -> [(Var, Lexp)] -> Either String TEnv
+        refine currEnv [] = Right currEnv
+        refine currEnv ((x, Lfob args body'):rest) =
             let argEnv = [(argName, argType) | (argName, argType) <- args]
-                t = check True (argEnv ++ currentEnv ++ env) body'
+                t = check True (argEnv ++ currEnv ++ env) body'
             in case t of
                 Terror msg -> Left ("Déclaration invalide pour '" ++ 
                                     x ++ "' : " ++ msg)
-                _ -> case refineDecls ((x, Tfob (map snd args) t) : currentEnv) rest of
+                _ -> case refine ((x, Tfob (map snd args) t) : currEnv) rest of
                         Left err -> Left err
                         Right refined -> Right refined
 
-        refinedEnv = refineDecls fullEnv decls
+        refinedEnv = refine fullEnv decls
     in case refinedEnv of
         Left msg -> Terror msg
         Right finalEnv -> check True (finalEnv ++ env) body
 
 -- Cas par défaut : erreur pour une expression inconnue.
 check _ _ _ = Terror "Expression inconnue."
-
-
-
-
-
-
-
 
 ---------------------------------------------------------------------------
 -- Pré-évaluation
@@ -494,7 +489,8 @@ l2d tenv (Lsend func args) =
         args' = map (l2d tenv) args
     in Dsend func' args'
 l2d tenv (Lfix decls body) =
-    let -- Créer le nouvel environnement avec les types (pour les variables récursives)
+    let -- Créer le nouvel environnement avec les types 
+        -- (pour les variables récursives)
         newEnv = [(v, t) | (v, e) <- decls, let t = check True tenv e] ++ tenv
         -- Convertir les expressions des déclarations
         decls' = map (\(_, e) -> l2d newEnv e) decls
@@ -516,6 +512,7 @@ type VEnv = [Value]
 eval :: VEnv -> Dexp -> Value
 eval _ (Dnum n) = Vnum n
 eval _ (Dbool b) = Vbool b
+-- Petit compteur à 0 pour tracker l'indice courrant dans VEnv
 eval env (Dvar vIndex) = getVal env vIndex 0
 eval env (Dtest cond thenE elseE) =
     case eval env cond of
