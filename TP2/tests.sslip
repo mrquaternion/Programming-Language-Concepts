@@ -4,5 +4,10 @@
 (fix ((myfunc (fob ((y Num)) (: (if (> y 2) 100 1) Num)))) (let x (: (* 2 (myfunc 3)) Num) (: (+ x 2) Num))) ; VALIDE (PAR EVALUATION ET TYPAGE)
 (fix ((e2 (fob ((y Num)) (: (if (≥ y 4) true false) Bool))) (e1 (fob ((x Num)) (: (e2 x) Bool)))) (e1 5)) ; VALIDE (PAR EVALUATION ET TYPAGE)
 
-(let x (: 5 Num) (: (+ x 3) Num))
-((fob ((x Num)) ((fob ((y Num)) (: (+ x y) Num)) (: 3 Num)))(: 2 Num))
+
+(let x (: 42 Bool) (: (+ x 3) Num)) ; x est annoté comme Bool, résultat retourne un Num (45)
+(fix ((fonction (fob ((x Num)) (: (+ x 1) Bool)))) (fonction 3)) ; fonction retourne un Bool, résultat un Num (4)
+(fix ((fonction (fob ((x Num)) (: (if (= x 0) true false) Num)))) (fonction 5)) ; focntion retourne un Num, résultat donne False
+(let x (: 5 Num) (: (+ x y) Num)) 
+(fix ((fonction (fob ((x Num)) (: (+ x 1) Num)))) (fonction true))
+

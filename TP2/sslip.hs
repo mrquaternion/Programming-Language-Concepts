@@ -124,9 +124,9 @@ pSexpTop = do { pSpaces;
               }
 
 -- On distingue l'analyse syntaxique d'une Sexp principale de celle d'une
--- sous-Sexp: si l'analyse d'une sous-Sexp échoue à EOF, c'est une erreur de
--- syntaxe alors que si l'analyse de la Sexp principale échoue cela peut être
--- tout à fait normal.
+-- sous-Sexp: si l'analyse d'une sous-Sexp échoue à EOF, c'est une erreur 
+-- de syntaxe alors que si l'analyse de la Sexp principale échoue cela 
+-- peut être tout à fait normal.
 pSexp :: Parser Sexp
 pSexp = pSexpTop <|> error "Unexpected end of stream"
 
@@ -137,8 +137,8 @@ pSexps = do pSpaces
                      pSpaces
                      return e)
 
--- Déclare que notre analyseur syntaxique peut-être utilisé pour la fonction
--- générique "read".
+-- Déclare que notre analyseur syntaxique peut-être utilisé pour la 
+-- fonction générique "read".
 instance Read Sexp where
     readsPrec _p s = case parse pSexp "" s of
                       Left _ -> []
@@ -166,8 +166,8 @@ instance Show Sexp where
     showsPrec p = showSexp'
 -}
 
--- Pour lire et imprimer des Sexp plus facilement dans la boucle interactive
--- de Hugs/GHCi:
+-- Pour lire et imprimer des Sexp plus facilement dans la boucle 
+-- interactive de Hugs/GHCi:
 readSexp :: String -> Sexp
 readSexp = read
 showSexp :: Sexp -> String
@@ -255,7 +255,7 @@ s2l (Snode (Ssym "fix") [decls, body]) =
 
       -- Gestion des erreurs
       sdecl2ldecl se =
-        error ("Déclaration inconnue dans fix : " ++ showSexp se)
+        error ("Declaration inconnue dans fix : " ++ showSexp se)
   in Lfix (map sdecl2ldecl (s2list decls)) (s2l body)
 s2l (Snode f args)
   = Lsend (s2l f) (map s2l args)
@@ -311,33 +311,49 @@ type TEnv = [(Var, Type)]
 -- Si `c` est vrai, on fait une vérification complète, alors que s'il
 -- est faux, alors on présume que le code est typé correctement et on
 -- se contente de chercher le type.
+
+showError :: Type -> String
+showError (Terror msg) = msg
+showError t = show t
+
 check :: Bool -> TEnv -> Lexp -> Type
+-- Cas des constantes numériques : retourne le type `Tnum` directement.
 check _ _ (Lnum _) = Tnum
+
+-- Cas des constantes booléennes : retourne le type `Tbool` directement.
 check _ _ (Lbool _) = Tbool
--- Variables
+
+-- Variables : vérifie si la variable est définie dans l'environnement `env`.
+-- Si oui, retourne son type. Sinon, renvoie une erreur indiquant que la
+-- variable est non définie.
 check _ env (Lvar x) =
     case lookup x env of
         Just t -> t
-        Nothing -> Terror ("Variable inconnue: " ++ x)
+        Nothing -> Terror ("Variable non definie : '" ++ x ++ "'")
 
--- Annotation de type
+-- Annotation de type : vérifie si l'expression annotée a le type attendu.
+-- Si les types correspondent, retourne le type. Sinon, renvoie une erreur.
 check True env (Ltype e t) =
     let t' = check True env e
     in if t' == t 
        then t 
-       else if t' == Terror "Expression inconnue" 
-            then Terror ("Expression mal formée : " ++ show e)
-            else Terror ("Mauvais type : attendu " ++ show t 
-                         ++ ", obtenu " ++ show t')
+       else Terror ("Annotation invalide. Attendu : " ++ show t ++
+                    ", obtenu : " ++ showError t' ++ ".")
+
+-- Si l'annotation est utilisée en mode non strict (`check False`), suppose
+-- que le type annoté est correct.
 check False _ (Ltype _ t) = t
 
--- Déclaration locale let x e1 e2
+-- Déclaration locale `let` : ajoute la variable définie à l'environnement
+-- et vérifie l'expression suivante dans ce nouvel environnement.
 check True env (Llet x e1 e2) =
     let t1 = check True env e1
-    in if t1 == Terror "Expression inconnue"
-       then Terror ("Erreur dans Llet : " ++ x ++ " a un type invalide")
+    in if case t1 of Terror _ -> True; _ -> False
+       then Terror ("Type invalide pour '" ++ x ++ "' : " ++ showError t1 ++ ".")
        else check True ((x, t1) : env) e2
 
+-- Conditionnelle `if` : vérifie que la condition est un booléen et que
+-- les deux branches ont le même type.
 check True env (Ltest e1 e2 e3) =
     case check True env e1 of
         Tbool ->
@@ -345,68 +361,81 @@ check True env (Ltest e1 e2 e3) =
                 t3 = check True env e3
             in if t2 == t3 
                 then t2 
-                else Terror "Branches de if de types différents"
-        t -> Terror ("Condition de if n'est pas un booléen, obtenu : " 
-                    ++ show t)
+                else Terror ("Branches conditionnelles de types différents : " ++
+                             showError t2 ++ " et " ++ showError t3 ++ ".")
+        t -> Terror ("Condition non booléenne : " ++ showError t ++ ".")
 
--- Appel de fonction
+-- Appel de fonction : vérifie que la fonction est une `Tfob` et que les
+-- arguments ont les types attendus.
 check True env (Lsend f args) =
     case check True env f of
         Tfob argTypes returnType ->
             if length args /= length argTypes
-            then Terror ("Nombre d'arguments incorrect pour Lsend : attendu "
-                         ++ show (length argTypes) 
-                         ++ ", obtenu : " 
-                         ++ show (length args))
-            else if validateArgs args argTypes
-                 then returnType
-                 else Terror ("Types des arguments incorrects pour Lsend : " 
-                              ++ show (zip args argTypes))
-        t -> Terror ("Expression appelee n'est pas une fonction, type obtenu: " 
-                     ++ show t)
-  where
-    validateArgs :: [Lexp] -> [Type] -> Bool
-    validateArgs [] [] = True
-    validateArgs (arg:args') (expected:expected') =
-        let actual = check True env arg
-        in actual == expected && validateArgs args' expected'
-    validateArgs _ _ = False
+            then Terror ("Nombre d'arguments incorrect : attendu " ++
+                         show (length argTypes) ++ ", obtenu " ++
+                         show (length args) ++ ".")
+            else 
+                let checkedArgs = zip args argTypes
+                    results = map (\(arg, expectedType) -> 
+                                    let actual = check True env arg
+                                    in if actual == expectedType
+                                       then Right ()
+                                       else Left ("Argument invalide : '" ++
+                                                  show arg ++ "', attendu : " ++
+                                                  show expectedType ++ ", obtenu : " ++
+                                                  showError actual ++ ".")
+                                  ) checkedArgs
+                in case sequence results of
+                     Right _ -> returnType
+                     Left err -> Terror err
+        Terror msg -> Terror ("Fonction appelée invalide : " ++ msg)
+        _ -> Terror "Expression appelée non fonctionnelle."
 
--- Déclaration de fonction
+-- Déclaration de fonction `fob` : ajoute les arguments à l'environnement
+-- et vérifie le corps de la fonction.
 check True env (Lfob args body) =
     let argEnv = [(x, t) | (x, t) <- args]
         fullEnv = argEnv ++ env
     in case check True fullEnv body of
-        Terror msg -> Terror ("Erreur dans le corps de Lfob : " ++ msg)
+        Terror msg -> Terror ("Corps de la fonction invalide : " ++ msg)
         t -> Tfob (map snd args) t
 
--- Déclaration locale récursive
+-- Déclaration locale récursive `fix` : initialise l'environnement avec des
+-- types par défaut, affine les types des déclarations et vérifie le corps.
 check True env (Lfix decls body) =
     let
-        -- Étape 1 : Ajouter des types par défaut
-        initEnv = [(x, Tfob (map snd args) (Terror "Type inconnu")) | (x, Lfob args _) <- decls]
+        -- Initialisation avec des types inconnus
+        initEnv = [(x, Tfob (map snd args) (Terror "Type inconnu")) 
+                  | (x, Lfob args _) <- decls]
         fullEnv = initEnv ++ env
 
-        -- Étape 2 : Raffinement des types
+        -- Raffinement des déclarations
         refineDecls :: TEnv -> [(Var, Lexp)] -> Either String TEnv
         refineDecls currentEnv [] = Right currentEnv
         refineDecls currentEnv ((x, Lfob args body'):rest) =
             let argEnv = [(argName, argType) | (argName, argType) <- args]
                 t = check True (argEnv ++ currentEnv ++ env) body'
             in case t of
-                Terror err -> Left ("Erreur dans la déclaration de " ++ x ++ ": " ++ err)
+                Terror msg -> Left ("Déclaration invalide pour '" ++ 
+                                    x ++ "' : " ++ msg)
                 _ -> case refineDecls ((x, Tfob (map snd args) t) : currentEnv) rest of
                         Left err -> Left err
                         Right refined -> Right refined
 
         refinedEnv = refineDecls fullEnv decls
     in case refinedEnv of
-        Left err -> Terror err
+        Left msg -> Terror msg
         Right finalEnv -> check True (finalEnv ++ env) body
 
+-- Cas par défaut : erreur pour une expression inconnue.
+check _ _ _ = Terror "Expression inconnue."
 
--- Cas par défaut
-check _ _ _ = Terror "Expression inconnue"
+
+
+
+
+
+
 
 ---------------------------------------------------------------------------
 -- Pré-évaluation
