@@ -24,7 +24,7 @@
 \fancyhf{}
 \fancyhead[L]{IFT-2035 : TP2}
 \fancyhead[R]{\thepage}
-\fancyfoot[C]{\small Université de Montréal \textbullet{} \today}
+\fancyfoot[C]{\small Université de Montréal \textbullet{} 29 novembre 2024}
 
 % Définition du titre et des auteurs
 \title{IFT-2035 : TP2}
@@ -32,7 +32,7 @@
     Mathias La Rochelle (20269985) \\ 
     Michel Lamothe (20243894)
 }
-\date{\today}
+\date{29 novembre 2024}
 
 \begin{document}
 
@@ -183,7 +183,16 @@
         n'est pas évident de comprendre comment une expression se décompose durant
         l'évaluation et cela est principalement dû au fait que les techniques de 
         débogage ne sont pas trivials en Haskell comparativement à des languages
-        de programmations impératifs comme Java et Python.
+        de programmations impératifs comme Java et Python. \\
+
+        \textit{Update en date du 30 novembre} : Nous nous sommes aperçu que 
+        nous ne gérons pas le cas du type $(\tau_1\, ...\, \tau_n \rightarrow \tau)$.
+        Ce petit problème de derrière minute, qui n'aurait pas du avoir lieu si on 
+        lisait bien l'énoncé, a causé beaucoup de trouble et c'est à ce moment que 
+        nous nous sommes rendus compte à quel point la fonction \texttt{check} 
+        était longue à implémenter. Définitivement la plus complexe de ce travail. 
+        Nous avons du faire un 2e cas dans son "pattern" `Lfix' tellement que ça 
+        nous énervaient.
     \subsection{Ce que nous avons appris}
         À travers ce TP, nous avons appris à implémenter la logique derrière 
         la compréhension de types d'un interpréteur ainsi que la transformation

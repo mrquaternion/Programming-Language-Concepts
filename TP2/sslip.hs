@@ -210,8 +210,13 @@ svar2lvar se = error ("Pas un symbole: " ++ showSexp se)
 s2type :: Sexp -> Type
 s2type (Ssym "Num") = Tnum
 s2type (Ssym "Bool") = Tbool
-s2type (Snode (Ssym "fob") [argTypes, retType]) =
-  Tfob (map s2type (s2list argTypes)) (s2type retType)
+s2type (Snode firstType rest) =
+    let returnType = s2type (last rest)
+        argsType = s2type firstType : mymap s2type (init rest)
+    in Tfob argsType returnType
+    where 
+        mymap :: (Sexp -> Type) -> [Sexp] -> [Type]
+        mymap f rest' = map f (filter (\x -> x /= Ssym "->") rest')
 s2type (Snode (Ssym ":") [_, t]) = s2type t
 s2type se = error ("Type inconnu : " ++ showSexp se)
 
@@ -219,7 +224,7 @@ argToTuple :: Sexp -> (Var, Type)
 argToTuple (Snode (Ssym v) [t]) = (v, s2type t) -- Argument avec son type
 argToTuple se = error ("Argument invalide dans fix : " ++ showSexp se)
 
--- Première passe simple qui analyse une Sexp et construit une Lexp équivalente.
+-- Première passe simple qui analyse une Sexp et construit une Lexp équivalente
 -- La majorité du code provient de la correction du TP1 disponible
 -- sur Studium. Elle a été adaptée pour gérer les types tau
 s2l :: Sexp -> Lexp
@@ -227,11 +232,11 @@ s2l (Ssym "true") = Lbool True
 s2l (Ssym "false") = Lbool False
 s2l (Snum n) = Lnum n
 s2l (Ssym s) = Lvar s
-s2l (Snode (Ssym ":") [e, t]) 
+s2l (Snode (Ssym ":") [e, t])
   = Ltype (s2l e) (s2type t)
 s2l (Snode (Ssym "if") [e1, e2, e3])
   = Ltest (s2l e1) (s2l e2) (s2l e3)
-s2l (Snode (Ssym "fob") [args, body]) 
+s2l (Snode (Ssym "fob") [args, body])
   = Lfob (map argToTuple (s2list args)) (s2l body)
 s2l (Snode (Ssym "let") [x, e1, e2])
   = Llet (svar2lvar x) (s2l e1) (s2l e2)
@@ -333,8 +338,8 @@ check _ env (Lvar x) =
 -- Si les types correspondent, retourne le type.
 check True env (Ltype e t) =
     let t' = check True env e
-    in if t' == t 
-       then t 
+    in if t' == t
+       then t
        else Terror ("Annotation invalide. Attendu : " ++ show t ++
                     ", obtenu : " ++ showError t' ++ ".")
 
@@ -347,7 +352,7 @@ check False _ (Ltype _ t) = t
 check True env (Llet x e1 e2) =
     let t1 = check True env e1
     in if case t1 of Terror _ -> True; _ -> False
-       then Terror ("Type invalide pour '" ++ x ++ "' : " 
+       then Terror ("Type invalide pour '" ++ x ++ "' : "
                    ++ showError t1 ++ ".")
        else check True ((x, t1) : env) e2
 
@@ -358,9 +363,9 @@ check True env (Ltest e1 e2 e3) =
         Tbool ->
             let t2 = check True env e2
                 t3 = check True env e3
-            in if t2 == t3 
-                then t2 
-                else Terror ("Branches conditionnelles de types différents : " 
+            in if t2 == t3
+                then t2
+                else Terror ("Branches conditionnelles de types différents : "
                             ++ showError t2 ++ " et " ++ showError t3 ++ ".")
         t -> Terror ("Condition non booléenne : " ++ showError t ++ ".")
 
@@ -373,19 +378,17 @@ check True env (Lsend f args) =
             then Terror ("Nombre d'arguments incorrect : attendu " ++
                          show (length argTypes) ++ ", obtenu " ++
                          show (length args) ++ ".")
-            else 
-                let checkedArgs = zip args argTypes
-                    results = map (\(arg, expectedType) -> 
-                                    let actual = check True env arg
-                                    in if actual == expectedType
-                                       then Right ()
-                                       else Left ("Argument invalide : " 
-                                                 ++ show arg 
-                                                 ++ ", attendu : " 
-                                                 ++ show expectedType 
-                                                 ++ ", obtenu : " 
-                                                 ++ showError actual 
-                                                 ++ ".")
+            else let checkedArgs = zip args argTypes
+                     results = map (\(arg, expectedType) -> 
+                        let actual = check True env arg
+                        in if actual == expectedType 
+                            then Right ()
+                            else Left ("Argument invalide : "
+                                      ++ show arg
+                                      ++ ", attendu : "
+                                      ++ show expectedType
+                                      ++ ", obtenu : "
+                                      ++ showError actual ++ ".")
                                   ) checkedArgs
                 in case sequence results of
                      Right _ -> returnType
@@ -407,22 +410,37 @@ check True env (Lfob args body) =
 check True env (Lfix decls body) =
     let
         -- Initialisation avec des types inconnus
-        initEnv = [(x, Tfob (map snd args) (Terror "Type inconnu")) 
+        initEnv = [(x, Tfob (map snd args) (Terror "Type inconnu"))
                   | (x, Lfob args _) <- decls]
         fullEnv = initEnv ++ env
 
         -- Raffinement des déclarations
         refine :: TEnv -> [(Var, Lexp)] -> Either String TEnv
         refine currEnv [] = Right currEnv
+        -- Premier cas (annotation avec Ltype)
+        refine currEnv ((x, Lfob args (Ltype body' expectedType)):rest) =
+            let argEnv = [(argName, argType) | (argName, argType) <- args]
+                funcType = Tfob (map snd args) expectedType
+                envWithFunc = (x, funcType) : currEnv  
+                t = check True (argEnv ++ envWithFunc ++ env) body'
+            in case t of
+                Terror msg -> Left ("Déclaration invalide pour '" 
+                                    ++ x ++ "' : " ++ msg)
+                _ -> case refine envWithFunc rest of
+                    Left err -> Left err
+                    Right refined -> Right refined
+        -- Deuxième cas (sans annotation Ltype mais infère le type du corps)
         refine currEnv ((x, Lfob args body'):rest) =
             let argEnv = [(argName, argType) | (argName, argType) <- args]
-                t = check True (argEnv ++ currEnv ++ env) body'
+                envWithFnc 
+                    = (x, Tfob (map snd args) (Terror "Type inconnu")) : currEnv
+                t = check True (argEnv ++ envWithFnc ++ env) body'
             in case t of
-                Terror msg -> Left ("Déclaration invalide pour '" ++ 
-                                    x ++ "' : " ++ msg)
+                Terror msg -> Left ("Déclaration invalide pour '" 
+                                    ++ x ++ "' : " ++ msg)
                 _ -> case refine ((x, Tfob (map snd args) t) : currEnv) rest of
-                        Left err -> Left err
-                        Right refined -> Right refined
+                    Left err -> Left err
+                    Right refined -> Right refined
 
         refinedEnv = refine fullEnv decls
     in case refinedEnv of
@@ -529,9 +547,8 @@ eval env (Dsend f actuals) =
             if nArgs == length actualsv
             then eval (actualsv ++ env') body
             else error ("Nombre invalide d'arguments : reçu "
-                                            ++ show (length actualsv)
-                                            ++ " au lieu de "
-                                            ++ show nArgs)
+                       ++ show (length actualsv)
+                       ++ " au lieu de " ++ show nArgs)
         v -> error ("Pas une fonction : " ++ show v)
 eval env (Dlet e1 e2) =
     let val = eval env e1
@@ -591,22 +608,8 @@ valOf :: String -> Value
 valOf = evalSexp . sexpOf
 
 
+test :: Sexp
+test = readSexp "(fix (((f (x Num)) (Num -> Bool) (fob ((y Num)) (if (= x y) true ((f (- x 1)) y))))) ((f 15) 10))"
 
--- ################ TEST ################
-test1 :: Lexp
-test1 = s2l (sexpOf "(if true 1 2)")
-
-test2 :: Lexp
-test2 = s2l (sexpOf "(fix (((add1 (x Num)) Num (+ x 1))) (add1 41))")
-
-test3 :: Lexp
-test3 = s2l (sexpOf "(let x 42 (if (> x 0) true false))")
-
-testl2d_1 :: Dexp
-testl2d_1 = l2d tenv0 test1
-
-testl2d_2 :: Dexp
-testl2d_2 = l2d tenv0 test2
-
-testl2d_3 :: Dexp
-testl2d_3 = l2d tenv0 test3
+testL :: Lexp
+testL = s2l test

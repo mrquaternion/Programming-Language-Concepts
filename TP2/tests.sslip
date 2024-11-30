@@ -1,4 +1,13 @@
 ; #### Tests typés correctement ####
+(fix (
+  ((f (x Num)) (Num -> Bool) 
+    (fob ((y Num)) 
+      (if (≥ x y) 
+          ((f (/ x 2)) y) 
+          false)))
+) 
+((f 20) 10)) ; ↝ Tbool False
+
 (let x (: 42 Num) 
     (: (+ x 3) Num)) ; ↝ Tnum 45
 
