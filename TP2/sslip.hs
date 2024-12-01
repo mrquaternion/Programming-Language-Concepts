@@ -409,8 +409,8 @@ check True env (Lfob args body) =
 -- types par défaut, affine les types des déclarations et on vérifie le corps.
 check True env (Lfix decls body) =
     let
-        -- Initialisation avec des types inconnus
-        initEnv = [(x, Tfob (map snd args) (Terror "Type inconnu"))
+        -- Initialisation avec des types par défaut réalistes
+        initEnv = [(x, Tfob (map snd args) Tbool) -- Utilise Tbool comme type de retour par défaut
                   | (x, Lfob args _) <- decls]
         fullEnv = initEnv ++ env
 
@@ -432,9 +432,9 @@ check True env (Lfix decls body) =
         -- Deuxième cas (sans annotation Ltype mais infère le type du corps)
         refine currEnv ((x, Lfob args body'):rest) =
             let argEnv = [(argName, argType) | (argName, argType) <- args]
-                envWithFnc 
-                    = (x, Tfob (map snd args) (Terror "Type inconnu")) : currEnv
-                t = check True (argEnv ++ envWithFnc ++ env) body'
+                envWithFunc 
+                    = (x, Tfob (map snd args) Tbool) : currEnv -- Type provisoire Tbool
+                t = check True (argEnv ++ envWithFunc ++ env) body'
             in case t of
                 Terror msg -> Left ("Déclaration invalide pour '" 
                                     ++ x ++ "' : " ++ msg)
@@ -446,6 +446,7 @@ check True env (Lfix decls body) =
     in case refinedEnv of
         Left msg -> Terror msg
         Right finalEnv -> check True (finalEnv ++ env) body
+
 
 -- Cas par défaut : erreur pour une expression inconnue.
 check _ _ _ = Terror "Expression inconnue."
