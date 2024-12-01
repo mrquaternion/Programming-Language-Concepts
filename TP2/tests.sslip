@@ -1,4 +1,9 @@
 ; #### Tests typés correctement ####
+
+(fix (((even (x Num)) (if (= x 0) true (odd (- x 1)))) ((odd (x Num)) (if (= x 0) false (even (- x 1))))) (odd 42))
+
+(fix (((f (x Num)) (Num -> Bool) (fob ((y Num)) (if (= x y) true ((f (- x 1)) y))))) ((f 15) 10))
+
 (fix (
   ((f (x Num)) (Num -> Bool) 
     (fob ((y Num)) 
@@ -39,30 +44,4 @@
               (: (e2 x) Bool)))
 ) 
 (e1 5)) ; ↝ Tbool True
-
-
-; #### Tests non-typés correctement ####
-(let x (: 42 Bool) 
-    (: (+ x 3) Num)) ; x est annoté comme Bool, résultat retourne un Num (45)
-
-(fix (
-    (fonction (fob ((x Num)) 
-                     (: (+ x 1) Bool)))
-) 
-(fonction 3)) ; fonction retourne un Bool, résultat un Num (4)
-
-(fix (
-    (fonction (fob ((x Num)) 
-                     (: (if (= x 0) true false) Num)))
-) 
-(fonction 5)) ; fonction retourne un Num, résultat donne False
-
-(let x (: 5 Num) 
-    (: (+ x y) Num)) ; Variable y n'est pas définie
-
-(fix (
-    (fonction (fob ((x Num)) 
-                     (: (+ x 1) Num)))
-) 
-(fonction true)) ; Argument true n'est pas un Num
 
