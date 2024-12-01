@@ -11,6 +11,16 @@
 \usepackage{fancyhdr}
 \usepackage{enumitem}
 \usepackage{titlesec}
+\usepackage{listings}
+
+\lstset{ % Configuration des listings
+  language=Haskell,               % Langage de programmation
+  basicstyle=\ttfamily\footnotesize, % Style du texte
+  numbers=left,                  % Numérotation des lignes à gauche
+  stepnumber=0,                  % Numérotation des lignes toutes les 1 ligne
+  showstringspaces=false,         % Ne montre pas les espaces dans les chaînes
+  frame=single,                  % Cadre autour du code
+}
 
 % Configuration des marges
 \geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
@@ -99,15 +109,29 @@
         au module statique check. Ce comportement est cohérent avec l'objectif d'un typage statique, qui est de 
         détecter les erreurs avant l'exécution. \\
 
-
         \begin{enumerate}
-            \item \texttt{(let x (: 42 Bool) (: (+ x 3) Num))} \\[.5em]
+            \item \begin{lstlisting}
+(let x (: 42 Bool) 
+    (: (+ x 3) Num))
+            \end{lstlisting}
             => \textit{x} est annoté comme \texttt{Bool}, mais le résultat retourne un \texttt{Num} (45).
         
-            \item \texttt{(fix ((fonction (fob ((x Num)) (: (+ x 1) Bool)))) (fonction 3))} \\[.5em]
+            \item \begin{lstlisting}
+(fix (
+    (fonction (fob ((x Num)) 
+                        (: (+ x 1) Bool)))
+) 
+(fonction 3))
+            \end{lstlisting}
             => \textit{fonction} retournerait un \texttt{Bool}, mais le résultat est un \texttt{Num} (4).
         
-            \item \texttt{(fix ((fonction (fob ((x Num)) (: (if (= x 0) true false) Num)))) (fonction 5))} \\[.5em]
+            \item \begin{lstlisting}
+(fix (
+    (fonction (fob ((x Num)) 
+                     (: (if (= x 0) true false) Num)))
+) 
+(fonction 5))
+            \end{lstlisting}
             => \textit{fonction} retournerait un \texttt{Num}, mais le résultat donne \texttt{False}.
         \end{enumerate}
 
@@ -116,16 +140,23 @@
         Cela est généralement dû à des incohérences majeures dans les types ou à des expressions mal formées qui ne respectent pas 
         les règles de typage ou de syntaxe définies. \\
         \begin{enumerate}
-            \item \texttt{(let x (: 5 Num) (: (+ x y) Num))} \\[.5em]
+            \item \begin{lstlisting}
+(let x (: 5 Num) 
+    (: (+ x y) Num))
+            \end{lstlisting}
             => \textit{x} est annoté comme \texttt{Num}, mais la variable \texttt{y} n'est pas définie dans l'environnement.
         
-            \item \texttt{(fix ((fonction (fob ((x Num)) (: (+ x 1) Num)))) (fonction true))} \\[.5em]
+            \item \begin{lstlisting}
+(fix (
+    (fonction (fob ((x Num)) 
+                     (: (+ x 1) Num)))
+) 
+(fonction true))
+            \end{lstlisting}
             => \textit{fonction} attend un \texttt{Num} en argument, mais reçoit un \texttt{Bool}, ce qui cause une erreur de type.
         \end{enumerate}
 
 
-
-\newpage
 \section{Extensions possibles}
     \subsection{Types supplémentaires}
         Afin d'enrichir le language \texttt{sslip} et d'en augmenter ses capacités, l'ajout de 
@@ -164,7 +195,6 @@
     du corrigé et cela aurait 1. alourdi le code 2. compliqué le 
     débogage 3. ralenti la correction pour les auxiliaires.
 
-\newpage
 \section{Conclusion}
     \subsection{Surprises}
         Nous n'avions eu aucune surprise jusqu'au mercredi 27 novembre. On relit le 
