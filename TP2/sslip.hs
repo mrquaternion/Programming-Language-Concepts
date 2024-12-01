@@ -242,29 +242,25 @@ s2l (Snode (Ssym "let") [x, e1, e2])
   = Llet (svar2lvar x) (s2l e1) (s2l e2)
 s2l (Snode (Ssym "fix") [decls, body]) =
   let sdecl2ldecl :: Sexp -> (Var, Lexp)
-      -- Cas 1 : Déclaration simple (x e)
+      -- Déclaration simple (x e)
       sdecl2ldecl (Snode (Ssym v) [e]) =
         (v, s2l e)
-
-      -- Cas 2 : Déclaration typée (x τ e)
+      -- Déclaration typée (x τ e)
       sdecl2ldecl (Snode (Ssym v) [t, e]) =
         (v, Ltype (s2l e) (s2type t))
-
-      -- Cas 3 : Déclaration de fonction ((x (x1 τ1) ... (xn τn)) e)
+      -- Déclaration de fonction ((x (x1 τ1) ... (xn τn)) e)
       sdecl2ldecl (Snode (Snode (Ssym v) args) [e]) =
         (v, Lfob (map argToTuple args) (s2l e))
-
-      -- Cas 4 : Déclaration complète ((x (x1 τ1) ... (xn τn)) τ e)
+      -- Déclaration complète ((x (x1 τ1) ... (xn τn)) τ e)
       sdecl2ldecl (Snode (Snode (Ssym v) args) [t, e]) =
         (v, Lfob (map argToTuple args) (Ltype (s2l e) (s2type t)))
-
-      -- Gestion des erreurs
       sdecl2ldecl se =
         error ("Declaration inconnue dans fix : " ++ showSexp se)
   in Lfix (map sdecl2ldecl (s2list decls)) (s2l body)
 s2l (Snode f args)
   = Lsend (s2l f) (map s2l args)
 s2l se = error ("Expression Psil inconnue: " ++ showSexp se)
+
 
 ---------------------------------------------------------------------------
 -- Représentation du contexte d'exécution                                --
@@ -306,6 +302,7 @@ env0 = let binop f op =
            ("true",  Tbool, Vbool True),
            ("false", Tbool, Vbool False)]
 
+
 ---------------------------------------------------------------------------
 -- Vérification des types                                                --
 ---------------------------------------------------------------------------
@@ -322,18 +319,12 @@ showError (Terror msg) = msg
 showError t = show t
 
 check :: Bool -> TEnv -> Lexp -> Type
--- Cas des constantes numériques : retourne le type `Tnum` directement.
 check _ _ (Lnum _) = Tnum
-
--- Cas des constantes booléennes : retourne le type `Tbool` directement.
 check _ _ (Lbool _) = Tbool
-
--- Variables : vérifie si la variable est définie dans l'environnement `env`.
 check _ env (Lvar x) =
     case lookup x env of
         Just t -> t
         Nothing -> Terror ("Variable non definie : '" ++ x ++ "'")
-
 -- Annotation de type : vérifie si l'expression annotée a le type attendu.
 -- Si les types correspondent, retourne le type.
 check True env (Ltype e t) =
@@ -342,22 +333,19 @@ check True env (Ltype e t) =
        then t
        else Terror ("Annotation invalide. Attendu : " ++ show t ++
                     ", obtenu : " ++ showError t' ++ ".")
-
 -- Si l'annotation est utilisée en mode non strict (`check False`), 
--- on suppose que le type annoté est correct.
+-- on suppose que le type annoté est correct
 check False _ (Ltype _ t) = t
-
 -- Déclaration locale `let` : ajoute la variable définie à l'environnement
--- et vérifie l'expression suivante dans ce nouvel environnement.
+-- et vérifie l'expression suivante dans ce nouvel environnement
 check True env (Llet x e1 e2) =
     let t1 = check True env e1
     in if case t1 of Terror _ -> True; _ -> False
        then Terror ("Type invalide pour '" ++ x ++ "' : "
                    ++ showError t1 ++ ".")
        else check True ((x, t1) : env) e2
-
--- Conditionnelle `if` : vérifie que la condition est un booléen et que
--- les deux branches ont le même type.
+-- Branche `if` : vérifie que la condition est un booléen et que
+-- les deux branches ont le même type
 check True env (Ltest e1 e2 e3) =
     case check True env e1 of
         Tbool ->
@@ -368,9 +356,8 @@ check True env (Ltest e1 e2 e3) =
                 else Terror ("Branches conditionnelles de types différents : "
                             ++ showError t2 ++ " et " ++ showError t3 ++ ".")
         t -> Terror ("Condition non booléenne : " ++ showError t ++ ".")
-
 -- Appel de fonction : vérifie que la fonction est une `Tfob` et que les
--- arguments ont les types attendus.
+-- arguments ont les types attendus
 check True env (Lsend f args) =
     case check True env f of
         Tfob argTypes returnType ->
@@ -395,36 +382,41 @@ check True env (Lsend f args) =
                      Left err -> Terror err
         Terror msg -> Terror ("Fonction appelée invalide : " ++ msg)
         _ -> Terror "Expression appelée non fonctionnelle."
-
 -- Déclaration de fonction `fob` : ajoute les arguments à l'environnement
--- et on vérifie le corps de la fonction.
+-- et on vérifie le corps de la fonction
 check True env (Lfob args body) =
     let argEnv = [(x, t) | (x, t) <- args]
         fullEnv = argEnv ++ env
     in case check True fullEnv body of
         Terror msg -> Terror ("Corps de la fonction invalide : " ++ msg)
         t -> Tfob (map snd args) t
-
--- Déclaration locale récursive `fix` : initialise l'environnement avec des
--- types par défaut, affine les types des déclarations et on vérifie le corps.
+-- Déclaration locale récursive `fix` : initialise environnement avec des
+-- types par défaut et affine les types des déclarations
 check True env (Lfix decls body) =
     let
         -- Initialisation avec des types par défaut basés sur le contexte
-        initEnv = [(x, Tfob (map snd args) (guessType body))
-                  | (x, Lfob args body) <- decls]
+        initEnv = [(x, Tfob (map snd args) (guessType declBody))
+                  | (x, Lfob args declBody) <- decls]
         fullEnv = initEnv ++ env
-
         -- Fonction pour deviner un type plausible à partir du corps
         guessType :: Lexp -> Type
         guessType (Lnum _) = Tnum
         guessType (Lbool _) = Tbool
         guessType (Ltype _ t) = t
-        guessType (Ltest _ t1 _) = guessType t1 -- Prend le type d'une branche
-        guessType _ = Terror "Type inconnu" -- Par défaut si non déductible
-
+        guessType (Ltest _ t1 t2) =
+            let type1 = guessType t1
+                type2 = guessType t2
+            in case (type1, type2) of
+                (Terror _, _) -> type2 -- Si branche `then` est erreur
+                (_, Terror _) -> type1 -- Inversement
+                _ | type1 == type2 -> type1
+                  | otherwise -> 
+                    Terror ("Branches conditionnelles de types différents : " 
+                            ++ show type1 ++ " et " ++ show type2)
+        guessType _ = Terror "Type inconnu"
         -- Raffinement des déclarations
         refine :: TEnv -> [(Var, Lexp)] -> Either String TEnv
-        refine currEnv [] = Right currEnv
+        refine currEnv [] = Right currEnv       
         refine currEnv ((x, Lfob args body'):rest) =
             let argEnv = [(argName, argType) | (argName, argType) <- args]
                 t = check True (argEnv ++ currEnv ++ env) body'
@@ -439,11 +431,9 @@ check True env (Lfix decls body) =
     in case refinedEnv of
         Left msg -> Terror msg
         Right finalEnv -> check True (finalEnv ++ env) body
-
-
-
--- Cas par défaut : erreur pour une expression inconnue.
+-- Cas par défaut
 check _ _ _ = Terror "Expression inconnue."
+
 
 ---------------------------------------------------------------------------
 -- Pré-évaluation

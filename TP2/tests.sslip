@@ -1,15 +1,4 @@
 ; #### Tests typés correctement ####
-
-(fix (((accumulate (x Num)) 
-        (if (= x 0) 0 
-            (if (< x 5) (+ x (accumulate (- x 1))) 
-                (accumulate (- x 1)))))) 
-     (accumulate 10))
-
-(fix (((even (x Num)) (if (= x 0) true (odd (- x 1)))) ((odd (x Num)) (if (= x 0) false (even (- x 1))))) (odd 42))
-
-(fix (((f (x Num)) (Num -> Bool) (fob ((y Num)) (if (= x y) true ((f (- x 1)) y))))) ((f 15) 10))
-
 (fix (
   ((f (x Num)) (Num -> Bool) 
     (fob ((y Num)) 

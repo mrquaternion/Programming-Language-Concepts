@@ -12,6 +12,7 @@
 \usepackage{enumitem}
 \usepackage{titlesec}
 \usepackage{listings}
+\usepackage{tocloft} % Permet de manipuler la table des matières
 
 \lstset{ % Configuration des listings
   language=Haskell,               % Langage de programmation
@@ -49,11 +50,10 @@
 % Page de titre
 \maketitle
 
-\vspace{2em}
 % Table des matières
 \pagestyle{plain} % Style par défaut
 \tableofcontents
-\newpage
+\addcontentsline{toc}{section}{Liste des codes}
 \pagestyle{fancy} % Style par défaut
 
 % Contenu principal
@@ -93,7 +93,6 @@
         juste l'adapté aux constructeurs de \texttt{Dexp} qui ne prennent plus en compte le
         nom des variables déclarées mais plutôt l'entier de l'indice De Buijn.
 
-\newpage
 \section{Structures des tests}
     \subsection{Typés correctement}
         Du premier coup, la grande majorité des tests typés correctement
@@ -211,23 +210,13 @@
         séparant l'expression centrale qui représente le corps et le type. Cela à
         l'air simple comme modification mais cela nous a pris beaucoup de temps avant
         de comprendre comment gérer cela puis aussi durant la construction des tests 
-        qui respectaient la syntaxe complète de \texttt{Sslip}. \\
-
-        De plus, jamais nous avons imaginer que la récursivité allait être notre
+        qui respectaient la syntaxe complète de \texttt{Sslip}. De plus, jamais nous 
+        avons imaginer que la récursivité allait être notre
         plus grand ennemi. Comme on dit en anglais, "it was a pain in the ass". Ce
         n'est pas évident de comprendre comment une expression se décompose durant
         l'évaluation et cela est principalement dû au fait que les techniques de 
         débogage ne sont pas trivials en Haskell comparativement à des languages
-        de programmations impératifs comme Java et Python. \\
-
-        \textit{Update en date du 30 novembre} : Nous nous sommes aperçu que 
-        nous ne gérons pas le cas du type $(\tau_1\, ...\, \tau_n \rightarrow \tau)$.
-        Ce petit problème de derrière minute, qui n'aurait pas du avoir lieu si on 
-        lisait bien l'énoncé, a causé beaucoup de trouble et c'est à ce moment que 
-        nous nous sommes rendus compte à quel point la fonction \texttt{check} 
-        était longue à implémenter. Définitivement la plus complexe de ce travail. 
-        Nous avons du faire un 2e cas dans son "pattern" `Lfix' tellement que ça 
-        nous énervaient.
+        de programmations impératifs comme Java et Python. 
     \subsection{Ce que nous avons appris}
         À travers ce TP, nous avons appris à implémenter la logique derrière 
         la compréhension de types d'un interpréteur ainsi que la transformation
