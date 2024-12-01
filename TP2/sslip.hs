@@ -409,32 +409,25 @@ check True env (Lfob args body) =
 -- types par défaut, affine les types des déclarations et on vérifie le corps.
 check True env (Lfix decls body) =
     let
-        -- Initialisation avec des types par défaut réalistes
-        initEnv = [(x, Tfob (map snd args) Tbool) -- Utilise Tbool comme type de retour par défaut
-                  | (x, Lfob args _) <- decls]
+        -- Initialisation avec des types par défaut basés sur le contexte
+        initEnv = [(x, Tfob (map snd args) (guessType body))
+                  | (x, Lfob args body) <- decls]
         fullEnv = initEnv ++ env
+
+        -- Fonction pour deviner un type plausible à partir du corps
+        guessType :: Lexp -> Type
+        guessType (Lnum _) = Tnum
+        guessType (Lbool _) = Tbool
+        guessType (Ltype _ t) = t
+        guessType (Ltest _ t1 _) = guessType t1 -- Prend le type d'une branche
+        guessType _ = Terror "Type inconnu" -- Par défaut si non déductible
 
         -- Raffinement des déclarations
         refine :: TEnv -> [(Var, Lexp)] -> Either String TEnv
         refine currEnv [] = Right currEnv
-        -- Premier cas (annotation avec Ltype)
-        refine currEnv ((x, Lfob args (Ltype body' expectedType)):rest) =
-            let argEnv = [(argName, argType) | (argName, argType) <- args]
-                funcType = Tfob (map snd args) expectedType
-                envWithFunc = (x, funcType) : currEnv  
-                t = check True (argEnv ++ envWithFunc ++ env) body'
-            in case t of
-                Terror msg -> Left ("Déclaration invalide pour '" 
-                                    ++ x ++ "' : " ++ msg)
-                _ -> case refine envWithFunc rest of
-                    Left err -> Left err
-                    Right refined -> Right refined
-        -- Deuxième cas (sans annotation Ltype mais infère le type du corps)
         refine currEnv ((x, Lfob args body'):rest) =
             let argEnv = [(argName, argType) | (argName, argType) <- args]
-                envWithFunc 
-                    = (x, Tfob (map snd args) Tbool) : currEnv -- Type provisoire Tbool
-                t = check True (argEnv ++ envWithFunc ++ env) body'
+                t = check True (argEnv ++ currEnv ++ env) body'
             in case t of
                 Terror msg -> Left ("Déclaration invalide pour '" 
                                     ++ x ++ "' : " ++ msg)
@@ -446,6 +439,7 @@ check True env (Lfix decls body) =
     in case refinedEnv of
         Left msg -> Terror msg
         Right finalEnv -> check True (finalEnv ++ env) body
+
 
 
 -- Cas par défaut : erreur pour une expression inconnue.
